@@ -20,14 +20,14 @@ func candidatasReales() []SucursalCandidata {
 
 func TestEmparejarNombresDeProduccion(t *testing.T) {
 	casos := map[string]string{
-		"La Habana":       "hab", // «lahabana» contiene «habana»
-		"Sancti Spíritus": "ss",  // una letra de diferencia: santispiritus / sanctispiritus
+		"La Habana":        "hab", // «lahabana» contiene «habana»
+		"Sancti Spíritus":  "ss",  // una letra de diferencia: santispiritus / sanctispiritus
 		"Santiago de Cuba": "stg",
-		"Camagüey":        "cam",
-		"Granma":          "bay", // la pareja escrita a mano: Granma es Bayamo
-		"Guantánamo":      "gtm",
-		"Holguín":         "hol",
-		"Las Tunas":       "tun",
+		"Camagüey":         "cam",
+		"Granma":           "bay", // la pareja escrita a mano: Granma es Bayamo
+		"Guantánamo":       "gtm",
+		"Holguín":          "hol",
+		"Las Tunas":        "tun",
 	}
 
 	for nombre, esperado := range casos {

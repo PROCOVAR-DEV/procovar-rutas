@@ -3,7 +3,7 @@
 # Los tres ejecutables van en la misma imagen y se elige con el `command` del
 # servicio: comparten código y no tiene sentido construir tres veces lo mismo.
 
-FROM golang:1.26-alpine AS construccion
+FROM golang:1.27-alpine AS construccion
 
 WORKDIR /src
 
@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /bin/api      ./cmd/api
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /bin/ingest   ./cmd/ingest && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /bin/migrate  ./cmd/migrate
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 # tzdata is essential, not an extra: without the time zone database
 # America/Havana does not exist and the 9:00–16:00 workday would be computed in

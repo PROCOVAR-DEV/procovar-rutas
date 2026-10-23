@@ -62,7 +62,6 @@ func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	// QUINCE SEGUNDOS, NO SESENTA.
 	//

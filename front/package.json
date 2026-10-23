@@ -6,7 +6,7 @@
     "dev": "next dev -p 3601",
     "build": "next build",
     "start": "next start -p 3601",
-    "lint": "next lint",
+    "lint": "tsc --noEmit",
     "test": "node --test --import ./tests/registrar.mjs 'tests/*.test.ts'",
     "test:front": "node --test scripts/pruebas-frontend.mjs",
     "api:mentira": "node scripts/api-de-mentira.mjs"
@@ -15,17 +15,20 @@
     "@iconify-json/lucide": "^1.2.126",
     "@iconify/react": "^6.0.2",
     "leaflet": "^1.9.4",
-    "next": "^15.1.6",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "next": "^15.5.28",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "react-leaflet": "^5.0.0",
     "swr": "^2.3.0"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.16",
-    "@types/node": "^22.10.7",
-    "@types/react": "^19.0.7",
-    "@types/react-dom": "^19.0.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.31"
   }
 }
