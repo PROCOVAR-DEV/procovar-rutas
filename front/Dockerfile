@@ -1,11 +1,11 @@
 # Imagen del frontend. Solo interfaz: no toca la base ni guarda secretos.
 
-FROM node:22-alpine AS dependencias
+FROM node:24-alpine AS dependencias
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev || npm install --omit=dev
 
-FROM node:22-alpine AS construccion
+FROM node:24-alpine AS construccion
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
@@ -16,7 +16,7 @@ ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 RUN adduser -D -u 10001 rutas

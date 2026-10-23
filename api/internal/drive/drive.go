@@ -53,7 +53,7 @@ type clienteGoogle struct {
 // files in the sellers' Drive, and it is better that it cannot even try.
 func New(ctx context.Context, credencialJSON []byte) (Client, error) {
 	svc, err := drive.NewService(ctx,
-		option.WithCredentialsJSON(credencialJSON),
+		option.WithAuthCredentialsJSON(option.ServiceAccount, credencialJSON),
 		option.WithScopes(drive.DriveReadonlyScope))
 	if err != nil {
 		return nil, fmt.Errorf("no se pudo abrir Drive: %w", err)
