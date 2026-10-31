@@ -113,6 +113,7 @@ return carpetas.map((c, i) => ({
   json: {
     ...c.json,
     known: (respuestas[i] && respuestas[i].json.known) || [],
+    failed: (respuestas[i] && respuestas[i].json.failed) || [],
   },
 }));
 """
@@ -134,14 +135,18 @@ for (let i = 0; i < carpetas.length; i++) {
   // Solo vale una «GPS Procesados» que Drive confirma colgando de ESTA carpeta. Los
   // resultados se casan con las carpetas por posición, y si alguna vez se descuadraran un
   // fichero acabaría archivado en la carpeta de otro vendedor, sin error y sin rastro.
-  const encontrada = ((destinos[i] && destinos[i].json.files) || [])
-    .find((d) => (d.parents || []).includes(c.carpetaId));
-  const destinoId = encontrada ? encontrada.id : '';
-  if (!destinoId) sinDestino.push(c.carpetaNombre);
+  const suyas = ((destinos[i] && destinos[i].json.files) || [])
+    .filter((d) => (d.parents || []).includes(c.carpetaId));
+  const procesadosId = (suyas.find((d) => d.name === 'GPS Procesados') || {}).id || '';
+  const erroresId = (suyas.find((d) => d.name === 'GPS Errores') || {}).id || '';
+  if (!procesadosId || !erroresId) sinDestino.push(c.carpetaNombre);
 
   const ya = new Set(c.known);
+  const fallo = new Set(c.failed);
   for (const f of c.ficheros) {
     const yaEsta = ya.has(f.id);
+    // Lo que la ingesta dejó con error va a «GPS Errores» de ESTA carpeta; lo bueno, a «GPS Procesados».
+    const destinoId = fallo.has(f.id) ? erroresId : procesadosId;
 
     // Conocido y sin "GPS Procesados" donde meterlo: no hay nada que hacer con él.
     // No se pierde: la próxima pasada lo vuelve a dar por conocido, que cuesta nada.
@@ -171,7 +176,7 @@ console.log(`carpetas con ficheros: ${carpetas.length}`);
 console.log(`por bajar ahora: ${nuevos}` + (aplazados ? ` — quedan ${aplazados} para la próxima pasada` : ''));
 console.log(`sólo apartar (ya estaban dentro): ${apartar}`);
 if (sinDestino.length) {
-  console.log(`sin "GPS Procesados", no se aparta nada de: ${sinDestino.join(', ')}`);
+  console.log(`sin «GPS Procesados» o sin «GPS Errores» (correr crear-procesados.py): ${sinDestino.join(', ')}`);
 }
 
 return salida;
@@ -231,11 +236,11 @@ nodos = [
     # Si una carpeta no tiene "GPS Procesados", no se crea aquí: se crea de una vez
     # para todas con la credencial de su provincia (ver crear-procesados.py), que es
     # la que deja la subcarpeta con el mismo dueño que la carpeta y sus ficheros.
-    http("Buscar Procesados", 920, 0, {
+    http("Buscar destinos", 920, 0, {
         "url": DRIVE,
         **consulta(
-            ("q", "={{ \"name='GPS Procesados' and '\" + $json.carpetaId + \"' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false\" }}"),
-            ("fields", "files(id,parents)"),
+            ("q", "={{ \"(name='GPS Procesados' or name='GPS Errores') and '\" + $json.carpetaId + \"' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false\" }}"),
+            ("fields", "files(id,name,parents)"),
             ("supportsAllDrives", "true"),
             ("includeItemsFromAllDrives", "true"),
         ),
@@ -298,37 +303,6 @@ nodos = [
         "jsonBody": "={{ JSON.stringify({ account: $('Por fichero').item.json.cuenta, folderId: $('Por fichero').item.json.carpetaId, driveFileId: $('Por fichero').item.json.id, name: $('Por fichero').item.json.name, folderPath: [$('Por fichero').item.json.carpetaNombre], createdAt: $('Por fichero').item.json.createdTime, contentBase64: $json.contenidoBase64 }) }}",
         "options": {"response": {"response": {"neverError": True, "fullResponse": True}}},
     }),
-    # Sólo se aparta lo que el panel aceptó. Un fichero que falló se queda donde está
-    # a propósito: así la pasada siguiente lo reintenta en vez de esconderlo.
-    {
-        "name": "¿Entró bien?",
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2,
-        "position": [2460, 260],
-        "parameters": {"conditions": {
-            "options": {"caseSensitive": True, "version": 2},
-            "combinator": "and",
-            "conditions": [
-                {"id": "ok", "operator": {"type": "number", "operation": "gte"},
-                 "leftValue": "={{ $json.statusCode }}", "rightValue": 200},
-                {"id": "ok2", "operator": {"type": "number", "operation": "lt"},
-                 "leftValue": "={{ $json.statusCode }}", "rightValue": 300},
-                {"id": "destino", "operator": {"type": "string", "operation": "notEmpty", "singleValue": True},
-                 "leftValue": "={{ $('Por fichero').item.json.destinoId }}", "rightValue": ""},
-            ],
-        }, "options": {}},
-    },
-    http("Apartar el nuevo", 2680, 160, {
-        "method": "PATCH",
-        "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + $('Por fichero').item.json.id }}",
-        **consulta(
-            ("addParents", "={{ $('Por fichero').item.json.destinoId }}"),
-            ("removeParents", "={{ $('Por fichero').item.json.carpetaId }}"),
-            ("fields", "id"),
-            ("supportsAllDrives", "true"),
-        ),
-        "options": {"response": {"response": {"neverError": True, "fullResponse": True}}},
-    }, drive=True, on_error="continueRegularOutput"),
 ]
 
 conexiones = {
@@ -342,8 +316,8 @@ conexiones = {
     "GPX de la carpeta": {"main": [[{"node": "Juntar por carpeta", "type": "main", "index": 0}]]},
     "Juntar por carpeta": {"main": [[{"node": "¿Cuáles ya están?", "type": "main", "index": 0}]]},
     "¿Cuáles ya están?": {"main": [[{"node": "Pegar lo conocido", "type": "main", "index": 0}]]},
-    "Pegar lo conocido": {"main": [[{"node": "Buscar Procesados", "type": "main", "index": 0}]]},
-    "Buscar Procesados": {"main": [[{"node": "Repartir ficheros", "type": "main", "index": 0}]]},
+    "Pegar lo conocido": {"main": [[{"node": "Buscar destinos", "type": "main", "index": 0}]]},
+    "Buscar destinos": {"main": [[{"node": "Repartir ficheros", "type": "main", "index": 0}]]},
     "Repartir ficheros": {"main": [[{"node": "¿Ya está dentro?", "type": "main", "index": 0}]]},
     "¿Ya está dentro?": {"main": [
         [{"node": "Apartar lo conocido", "type": "main", "index": 0}],
@@ -352,12 +326,9 @@ conexiones = {
     "Por fichero": {"main": [[], [{"node": "Descargar", "type": "main", "index": 0}]]},
     "Descargar": {"main": [[{"node": "A base64", "type": "main", "index": 0}]]},
     "A base64": {"main": [[{"node": "Enviar a Rutas", "type": "main", "index": 0}]]},
-    "Enviar a Rutas": {"main": [[{"node": "¿Entró bien?", "type": "main", "index": 0}]]},
-    "¿Entró bien?": {"main": [
-        [{"node": "Apartar el nuevo", "type": "main", "index": 0}],
-        [{"node": "Por fichero", "type": "main", "index": 0}],
-    ]},
-    "Apartar el nuevo": {"main": [[{"node": "Por fichero", "type": "main", "index": 0}]]},
+    # Lo nuevo NO se aparta aquí: la API contesta 202 antes de procesar, y un XML roto se
+    # descubre después. En la pasada siguiente `known`/`failed` dicen a qué carpeta va cada uno.
+    "Enviar a Rutas": {"main": [[{"node": "Por fichero", "type": "main", "index": 0}]]},
 }
 
 cuerpo = {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Crea "GPS Procesados" dentro de cada carpeta de vendedor. De una sola vez.
+"""Crea "GPS Procesados" y "GPS Errores" dentro de cada carpeta de vendedor. De una sola vez.
 
 Con la credencial de SU provincia, no con la de la cuenta padre: así la subcarpeta
 queda con el mismo dueño que la carpeta y que los ficheros, y apartar un fichero es
@@ -9,7 +9,7 @@ Sólo toca las carpetas que el panel tiene dadas de alta; el resto del Drive de 
 provincia (PEDIDOS, Errores, lo que sea) se queda como está.
 
 Se puede volver a correr cuando entre un vendedor nuevo: no duplica nada, porque
-antes de crear mira quién la tiene ya.
+antes de crear mira quién la tiene ya (cada una de las dos por separado).
 
 Uso:  python3 crear-procesados.py <clave-api-n8n>
 """
@@ -105,36 +105,42 @@ conexiones = {
 salidas = []
 y = -560
 for prov, cred in PROVINCIAS.items():
-    n1, n2, n3, n4 = (f"Carpetas de {prov}", f"Ya la tienen {prov}",
-                      f"Faltan {prov}", f"Crear en {prov}")
-    nodos += [
-        http(n1, 60, y, {"url": DRIVE, **consulta(
-            ("q", f"'me' in owners and mimeType='{CARPETA}' and trashed=false"),
-            ("fields", "files(id,name)"),
-            ("pageSize", "1000"))}, cred=(cred, prov)),
-        http(n2, 280, y, {"url": DRIVE, **consulta(
-            ("q", f"name='GPS Procesados' and 'me' in owners and mimeType='{CARPETA}' and trashed=false"),
-            ("fields", "files(id,parents)"),
-            ("pageSize", "1000"))}, cred=(cred, prov)),
-        {"name": n3, "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [500, y],
-         "parameters": {"mode": "runOnceForAllItems", "jsCode": FALTAN % {"prov": prov}}},
-        http(n4, 720, y, {
-            "method": "POST", "url": DRIVE,
-            **consulta(("fields", "id,name"), ("supportsAllDrives", "true")),
-            "sendBody": True, "specifyBody": "json",
-            "jsonBody": "={{ JSON.stringify({ name: 'GPS Procesados', mimeType: '" + CARPETA + "', parents: [$json.carpetaId] }) }}",
-            "options": {"response": {"response": {"neverError": True}}},
-        }, cred=(cred, prov), on_error="continueRegularOutput"),
-    ]
-    conexiones[n1] = {"main": [[{"node": n2, "type": "main", "index": 0}]]}
-    conexiones[n2] = {"main": [[{"node": n3, "type": "main", "index": 0}]]}
-    conexiones[n3] = {"main": [[{"node": n4, "type": "main", "index": 0}]]}
+    n1 = f"Carpetas de {prov}"
+    nodos.append(http(n1, 60, y, {"url": DRIVE, **consulta(
+        ("q", f"'me' in owners and mimeType='{CARPETA}' and trashed=false"),
+        ("fields", "files(id,name)"),
+        ("pageSize", "1000"))}, cred=(cred, prov)))
+    conexiones[n1] = {"main": [[]]}
+    # Dos subcarpetas por vendedor: la de lo bueno y la de lo que falló. Cada una se mira y
+    # se crea por separado, así que correr esto de nuevo no duplica ninguna.
+    for k, nombre in enumerate(("GPS Procesados", "GPS Errores")):
+        n2, n3, n4 = (f"Ya la tienen {prov} ({nombre})", f"Faltan {prov} ({nombre})",
+                      f"Crear en {prov} ({nombre})")
+        yy = y + k * 60
+        nodos += [
+            http(n2, 280, yy, {"url": DRIVE, **consulta(
+                ("q", f"name='{nombre}' and 'me' in owners and mimeType='{CARPETA}' and trashed=false"),
+                ("fields", "files(id,parents)"),
+                ("pageSize", "1000"))}, cred=(cred, prov)),
+            {"name": n3, "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [500, yy],
+             "parameters": {"mode": "runOnceForAllItems", "jsCode": FALTAN % {"prov": prov}}},
+            http(n4, 720, yy, {
+                "method": "POST", "url": DRIVE,
+                **consulta(("fields", "id,name"), ("supportsAllDrives", "true")),
+                "sendBody": True, "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ name: '" + nombre + "', mimeType: '" + CARPETA + "', parents: [$json.carpetaId] }) }}",
+                "options": {"response": {"response": {"neverError": True}}},
+            }, cred=(cred, prov), on_error="continueRegularOutput"),
+        ]
+        conexiones[n1]["main"][0].append({"node": n2, "type": "main", "index": 0})
+        conexiones[n2] = {"main": [[{"node": n3, "type": "main", "index": 0}]]}
+        conexiones[n3] = {"main": [[{"node": n4, "type": "main", "index": 0}]]}
     salidas.append({"node": n1, "type": "main", "index": 0})
-    y += 140
+    y += 160
 
 conexiones["Las de Rutas"] = {"main": [salidas]}
 
-cuerpo = {"name": "Crear GPS Procesados en cada carpeta (repetible)",
+cuerpo = {"name": "Crear GPS Procesados y GPS Errores en cada carpeta (repetible)",
           "nodes": nodos, "connections": conexiones,
           "settings": {"executionOrder": "v1"}}
 

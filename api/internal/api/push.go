@@ -328,7 +328,7 @@ func (s *Server) ingestKnown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(p.DriveFileIDs) == 0 {
-		respond(w, http.StatusOK, map[string]any{"known": []string{}})
+		respond(w, http.StatusOK, map[string]any{"known": []string{}, "failed": []string{}})
 		return
 	}
 
@@ -340,5 +340,10 @@ func (s *Server) ingestKnown(w http.ResponseWriter, r *http.Request) {
 	if ya == nil {
 		ya = []string{}
 	}
-	respond(w, http.StatusOK, map[string]any{"known": ya})
+	fallidos, err := s.q.FailedFiles(r.Context(), p.DriveFileIDs)
+	if err != nil {
+		s.fail(w, "ficheros con error", err)
+		return
+	}
+	respond(w, http.StatusOK, map[string]any{"known": ya, "failed": fallidos})
 }
