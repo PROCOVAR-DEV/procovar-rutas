@@ -32,7 +32,8 @@ PROVINCIAS = {
     "LasTunas": "fHefRFz6HQfXt0Eh",
     "SantiSpiritus": "kXkGLZjFQ2Pu1Q2z",
     "Santiago": "sPEHylrec6dQWsEE",
-    "PalmaSoriano": "gXTBf4gP9aNcVwLj",
+    # El acceso gXTBf4gP9aNcVwLj («OAuth client was disabled») ya no sirve; este es el que usa el flujo de pedidos de Palma, que importa a diario.
+    "PalmaSoriano": "zU9mKCZZHIghvC3d",
     "Moa": "NFqUFPLVd9EAM1Fg",
 }
 
