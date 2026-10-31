@@ -131,7 +131,11 @@ let nuevos = 0, aplazados = 0, apartar = 0, sinDestino = [];
 
 for (let i = 0; i < carpetas.length; i++) {
   const c = carpetas[i].json;
-  const encontrada = ((destinos[i] && destinos[i].json.files) || [])[0];
+  // Solo vale una «GPS Procesados» que Drive confirma colgando de ESTA carpeta. Los
+  // resultados se casan con las carpetas por posición, y si alguna vez se descuadraran un
+  // fichero acabaría archivado en la carpeta de otro vendedor, sin error y sin rastro.
+  const encontrada = ((destinos[i] && destinos[i].json.files) || [])
+    .find((d) => (d.parents || []).includes(c.carpetaId));
   const destinoId = encontrada ? encontrada.id : '';
   if (!destinoId) sinDestino.push(c.carpetaNombre);
 
@@ -231,7 +235,7 @@ nodos = [
         "url": DRIVE,
         **consulta(
             ("q", "={{ \"name='GPS Procesados' and '\" + $json.carpetaId + \"' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false\" }}"),
-            ("fields", "files(id)"),
+            ("fields", "files(id,parents)"),
             ("supportsAllDrives", "true"),
             ("includeItemsFromAllDrives", "true"),
         ),

@@ -158,6 +158,10 @@ func main() {
 	// The consumer of n8n's queue runs alongside the timer: the files n8n pushes go
 	// in as soon as they arrive, and the scan remains the safety net that makes sure
 	// nothing is missing.
+	//
+	// Arranca en su propia goroutine y espera a Redis en vez de rendirse al primer
+	// fallo: ver EsperarRedis. El 23/10/2026 un solo ping fallido tras el reinicio del
+	// servidor dejó la ingesta sin consumidor una semana, sin que nada lo dijera.
 	if cfg.RedisURL != "" {
 		c, err := queue.New(cfg.RedisURL, cfg.PrefijoRedis)
 		if err != nil {
@@ -165,11 +169,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer c.Close()
-		if err := c.Ping(ctx); err != nil {
-			log.Warn("Redis no responde; no se consumirá la cola de n8n", "error", err)
-		} else {
-			go ingest.NewConsumer(svc, c, bus, log).Run(ctx)
-		}
+		go func() {
+			if ingest.EsperarRedis(ctx, c.Ping, 5*time.Second, log) {
+				ingest.NewConsumer(svc, c, bus, log).Run(ctx)
+			}
+		}()
 	}
 
 	if *queueOnly {
