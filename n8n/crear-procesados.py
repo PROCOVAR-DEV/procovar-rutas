@@ -83,6 +83,11 @@ return mias
 nodos = [
     {"name": "Empezar", "type": "n8n-nodes-base.manualTrigger", "typeVersion": 1,
      "position": [-620, -120], "parameters": {}},
+    # Cada 6 h, 20 min después de «Alta automática de carpetas GPS»: las carpetas que ésta da de alta
+    # reciben así sus dos subcarpetas sin que nadie pulse nada.
+    {"name": "Cada 6 horas", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2,
+     "position": [-620, -300],
+     "parameters": {"rule": {"interval": [{"field": "cronExpression", "expression": "20 */6 * * *"}]}}},
     # Disparable desde fuera: hay que volver a correrlo cada vez que se da de alta
     # una carpeta, y esperar a que alguien se acuerde de pulsar el botón es la forma
     # de que unas carpetas aparten y otras no.
@@ -99,6 +104,7 @@ nodos = [
 
 conexiones = {
     "Empezar": {"main": [[{"node": "Carpetas de Rutas", "type": "main", "index": 0}]]},
+    "Cada 6 horas": {"main": [[{"node": "Carpetas de Rutas", "type": "main", "index": 0}]]},
     "Disparar desde fuera": {"main": [[{"node": "Carpetas de Rutas", "type": "main", "index": 0}]]},
     "Carpetas de Rutas": {"main": [[{"node": "Las de Rutas", "type": "main", "index": 0}]]},
 }

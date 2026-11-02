@@ -85,6 +85,8 @@ func (s *Server) Routes() http.Handler {
 	r.Post("/api/ingest/file", s.receiveFile)
 	r.Get("/api/ingest/folders", s.ingestFolders)
 	r.Post("/api/ingest/folder-owner", s.ingestFolderOwner)
+	r.Get("/api/ingest/folders/all", s.ingestAllFolders)
+	r.Post("/api/ingest/register-folder", s.ingestRegisterFolder)
 	r.Post("/api/ingest/known", s.ingestKnown)
 	r.Get("/api/ingest/stats", s.ingestStats)
 

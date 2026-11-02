@@ -12,7 +12,8 @@ mano se copia mal uno y el fallo aparece tres pasadas después.
 | Guion | Qué deja en n8n |
 |---|---|
 | `construir-ingesta.py` | *Ingesta Rutas GPX* — la pasada cada 12 h. Sustituye el flujo existente, conservando su id |
-| `crear-procesados.py` | *Crear GPS Procesados en cada carpeta* — a mano, cuando entren vendedores nuevos |
+| `crear-procesados.py` | *Crear GPS Procesados y GPS Errores en cada carpeta* — ahora también solo, cada 6 h |
+| `alta-automatica.py` | *Alta automática de carpetas GPS* — cada 6 h descubre las carpetas de GPS nuevas (con `.gpx` y desconocidas para el panel), da permiso a la cuenta padre y las registra en `/api/ingest/register-folder`. Ya no hay que dar de alta a mano: `RUTAS_SERVICE_KEY=… python3 alta-automatica.py <clave-api-n8n>` |
 
 ```
 python3 construir-ingesta.py <clave-api-n8n>
