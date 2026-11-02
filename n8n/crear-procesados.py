@@ -34,7 +34,8 @@ PROVINCIAS = {
     "Santiago": "sPEHylrec6dQWsEE",
     # El acceso gXTBf4gP9aNcVwLj («OAuth client was disabled») ya no sirve; este es el que usa el flujo de pedidos de Palma, que importa a diario.
     "PalmaSoriano": "zU9mKCZZHIghvC3d",
-    "Moa": "NFqUFPLVd9EAM1Fg",
+    # El acceso NFqUFPLVd9EAM1Fg («MOA») está desactivado; este es el que usa el flujo de pedidos de Moa.
+    "Moa": "CIgJty26Cth6lmPi",
 }
 
 

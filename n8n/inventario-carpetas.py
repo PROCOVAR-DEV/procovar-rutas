@@ -35,7 +35,8 @@ PROVINCIAS = {
     "SantiSpiritus": "kXkGLZjFQ2Pu1Q2z",
     "Santiago": "sPEHylrec6dQWsEE",
     "PalmaSoriano": "zU9mKCZZHIghvC3d",
-    "Moa": "NFqUFPLVd9EAM1Fg",
+    # El acceso NFqUFPLVd9EAM1Fg («MOA») está desactivado; este es el que usa el flujo de pedidos de Moa.
+    "Moa": "CIgJty26Cth6lmPi",
 }
 
 

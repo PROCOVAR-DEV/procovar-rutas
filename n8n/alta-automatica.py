@@ -46,7 +46,8 @@ PROVINCIAS = {
     "Santiago": "sPEHylrec6dQWsEE",
     # El acceso gXTBf4gP9aNcVwLj de Palma está desactivado («OAuth client was disabled»); este es el del flujo de pedidos.
     "PalmaSoriano": "zU9mKCZZHIghvC3d",
-    "Moa": "NFqUFPLVd9EAM1Fg",
+    # El acceso NFqUFPLVd9EAM1Fg («MOA») está desactivado; este es el que usa el flujo de pedidos de Moa.
+    "Moa": "CIgJty26Cth6lmPi",
 }
 
 # Tope por provincia y pasada: un descubrimiento que quisiera dar de alta más que esto es un error de
