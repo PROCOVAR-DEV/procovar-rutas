@@ -43,7 +43,7 @@ type assignRequest struct {
 	AuthUserID string `json:"authUserId"`
 	BranchID   string `json:"branchId"`
 	PersonName string `json:"personName"`
-	Date     string `json:"date"`
+	Date       string `json:"date"`
 	// RememberAlias makes the next one resolve on its own. It is what turns the
 	// inbox into work done once per device instead of every single day.
 	//
