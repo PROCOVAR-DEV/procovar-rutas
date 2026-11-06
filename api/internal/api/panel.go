@@ -274,7 +274,7 @@ func (s *Server) week(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The panel's week is MONDAY TO FRIDAY, the company's working week.
+	// The panel's week is MONDAY TO SATURDAY, the company's working week.
 	dias := calendar.WorkWeek(fecha)
 	desde, hasta := dias[0], dias[len(dias)-1]
 

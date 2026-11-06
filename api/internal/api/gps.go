@@ -64,6 +64,17 @@ func (s *Server) personas(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Con `?carpeta=` solo la gente de la sucursal de ESA carpeta: un teléfono de Camagüey
+	// no se asigna a nadie de Holguín, ni siquiera quien puede verlo todo. Una carpeta sin
+	// sucursal todavía deja la lista como estaba, porque es precisamente la que hay que colocar.
+	if id := r.URL.Query().Get("carpeta"); id != "" {
+		if f, err := s.q.SourceByID(r.Context(), id); err == nil && f.BranchID != nil {
+			if suc, err := s.q.BranchByID(r.Context(), *f.BranchID); err == nil && suc.AuthOrgID != nil {
+				org = *suc.AuthOrgID
+			}
+		}
+	}
+
 	gente, err := s.auth.Members(r.Context(), org, []string{"GESTOR", "SUPERVISOR"})
 	if err != nil {
 		// Que Accesos no conteste no puede dejar la pantalla muda: se dice qué pasó,

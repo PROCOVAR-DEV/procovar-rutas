@@ -24,7 +24,7 @@ import SinPermiso from "@/components/SinPermiso";
 import { useSesion } from "@/components/Sesion";
 import { agruparPorSucursal, haceFaltaAgrupar } from "@/lib/porSucursal";
 import { useEvents } from "@/lib/events";
-import { ask, enviar, type Seller } from "@/lib/api";
+import { ask, borrar, enviar, type Seller } from "@/lib/api";
 
 interface FicheroAtascado {
   id: string;
@@ -445,6 +445,7 @@ export default function Revisar() {
                         alAsignar={cargar}
                         puedeAsignar={puede("rutas.alias")}
                       />
+                      {puede("rutas.carpeta") && <QuitarCarpeta carpeta={g} alQuitar={cargar} />}
                     </td>
                   </tr>
                   )));
@@ -742,6 +743,40 @@ function FilaRota({
   );
 }
 
+/**
+ * Quitar una carpeta que ya no se usa (el vendedor se fue, el teléfono ya no existe).
+ * Es dar de baja, no borrar: lo que ya entró por ella se queda en el histórico.
+ */
+function QuitarCarpeta({ carpeta, alQuitar }: { carpeta: Carpeta; alQuitar: () => void }) {
+  const [quitando, setQuitando] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
+
+  async function quitar() {
+    const aviso =
+      `¿Quitar la carpeta «${carpeta.name}»? Deja de barrerse y sale de esta lista. ` +
+      `Lo que ya subió se conserva.`;
+    if (!window.confirm(aviso)) return;
+    setQuitando(true);
+    setFallo(null);
+    try {
+      await borrar(`/api/sources/${carpeta.id}`);
+      alQuitar();
+    } catch (e) {
+      setFallo((e as Error).message);
+      setQuitando(false);
+    }
+  }
+
+  return (
+    <span className="elegir-puesto">
+      <button className="pv-boton pv-boton-menudo" disabled={quitando} onClick={quitar}>
+        {quitando ? "…" : "Quitar"}
+      </button>
+      {fallo && <span className="aviso">{fallo}</span>}
+    </span>
+  );
+}
+
 function ElegirDueno({
   carpeta,
   personas,
@@ -760,13 +795,24 @@ function ElegirDueno({
   // Con dueño ya puesto, el desplegable no se enseña hasta que se pide cambiarlo: la
   // columna se lee de un vistazo y lo normal es no tocar nada.
   const [cambiando, setCambiando] = useState(false);
+  // Solo la gente de la sucursal de ESTA carpeta: un super admin recibía las de todas y
+  // asignaba un teléfono de Camagüey a alguien de Holguín. Mientras llega, vale la lista general.
+  const [deLaSucursal, setDeLaSucursal] = useState<Persona[] | null>(null);
+  const eligiendo = puedeAsignar && (!carpeta.sellerId || cambiando);
+
+  useEffect(() => {
+    if (!eligiendo) return;
+    ask<Persona[]>(`/api/personas?carpeta=${encodeURIComponent(carpeta.id)}`)
+      .then((p) => setDeLaSucursal(p ?? []))
+      .catch(() => setDeLaSucursal(null));
+  }, [eligiendo, carpeta.id]);
 
   async function asignar() {
     if (!quien) return;
     setGuardando(true);
     setFallo(null);
     try {
-      const persona = personas.find((p) => p.authUserId === quien);
+      const persona = lista.find((p) => p.authUserId === quien);
       const r = await enviar<{ placed: number; days: number }>(
         `/api/gps/${carpeta.id}/asignar`,
         { authUserId: quien, name: persona?.name ?? "" },
@@ -785,6 +831,8 @@ function ElegirDueno({
       setGuardando(false);
     }
   }
+
+  const lista = deLaSucursal ?? personas;
 
   if (hecho) return <span className="sub">{hecho}</span>;
 
@@ -806,15 +854,15 @@ function ElegirDueno({
   if (!puedeAsignar) return <span className="sub">sin asignar</span>;
 
   // Y sin gente que elegir, se dice por qué en vez de enseñar una lista vacía.
-  if (personas.length === 0) {
-    return <span className="sub">no se pudo traer la gente de Accesos</span>;
+  if (lista.length === 0) {
+    return <span className="sub">no hay gente de esta sucursal en Accesos</span>;
   }
 
   return (
     <div className="elegir">
       <select value={quien} onChange={(e) => setQuien(e.target.value)}>
         <option value="">¿De quién es?</option>
-        {personas.map((p) => (
+        {lista.map((p) => (
           <option key={p.authUserId} value={p.authUserId}>
             {p.name || p.email}
             {p.roles.length > 0 ? ` · ${p.roles.join(", ").toLowerCase()}` : ""}

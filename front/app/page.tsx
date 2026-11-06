@@ -59,8 +59,8 @@ function todayISO(): string {
 }
 
 // A partir de aquí se considera que el GPS de ese vendedor está fallando. Tres días
-// cubre el fin de semana: la jornada es de lunes a viernes, así que un lunes por la
-// mañana lo último es del viernes y eso es normal.
+// cubre el fin de semana: la jornada es de lunes a sábado, así que un lunes por la
+// mañana lo último es del sábado y eso es normal.
 const DIAS_MALO = 3;
 
 /** Un fichero que llegó y no se pudo colocar. */
@@ -97,7 +97,7 @@ export default function Calendar() {
   // Se entra viendo la semana laboral de hoy, que es lo que se quiere ver al entrar.
   const semana = useMemo(() => workWeek(todayISO()), []);
   const [desde, setDesde] = useState(semana[0]);
-  const [hasta, setHasta] = useState(semana[4]);
+  const [hasta, setHasta] = useState(semana[semana.length - 1]);
 
   const [data, setData] = useState<CalendarResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

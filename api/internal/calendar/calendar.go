@@ -1,14 +1,14 @@
 // Package calendar works out which days count.
 //
-// The company week runs Monday to Friday, so a Saturday with no file is not a
-// miss. Neither are holidays: without them, the 1st of May would show up as the
+// The company week runs Monday to Saturday, so a Saturday with no file is a miss
+// like any other day. Sunday and holidays are not: without them, the 1st of May would show up as the
 // whole workforce being absent and the panel would turn into noise.
 package calendar
 
 import "time"
 
-// DefaultWorkdays: Monday (1) to Friday (5), ISO numbering.
-var DefaultWorkdays = []int{1, 2, 3, 4, 5}
+// DefaultWorkdays: Monday (1) to Saturday (6), ISO numbering.
+var DefaultWorkdays = []int{1, 2, 3, 4, 5, 6}
 
 // IsWorkday says whether a date counts for tracking.
 func IsWorkday(date time.Time, workdays []int, holidays map[string]bool) bool {
@@ -41,10 +41,10 @@ func Workdays(from, to time.Time, holidays map[string]bool) []string {
 	return out
 }
 
-// WorkWeek returns Monday to Friday of the week containing the given date.
+// WorkWeek returns Monday to Saturday of the week containing the given date.
 //
-// Five days, not seven: the report and the weekly view are about the working
-// week. A Saturday with data is still stored, it just does not count as a miss.
+// Six days, not seven: the report and the weekly view are about the working
+// week. A Sunday with data is still stored, it just does not count as a miss.
 func WorkWeek(date time.Time) []time.Time {
 	iso := int(date.Weekday())
 	if iso == 0 {
@@ -53,7 +53,7 @@ func WorkWeek(date time.Time) []time.Time {
 	lunes := date.AddDate(0, 0, -(iso - 1))
 	lunes = time.Date(lunes.Year(), lunes.Month(), lunes.Day(), 0, 0, 0, 0, date.Location())
 
-	week := make([]time.Time, 5)
+	week := make([]time.Time, 6)
 	for i := range week {
 		week[i] = lunes.AddDate(0, 0, i)
 	}

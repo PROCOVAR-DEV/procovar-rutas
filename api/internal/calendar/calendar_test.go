@@ -10,18 +10,18 @@ func dia(s string) time.Time {
 	return t
 }
 
-func TestSemanaLaboralEsLunesAViernes(t *testing.T) {
+func TestSemanaLaboralEsLunesASabado(t *testing.T) {
 	// The 13th of August 2026 is a Thursday.
 	week := WorkWeek(dia("2026-08-13"))
 
-	if len(week) != 5 {
-		t.Fatalf("días = %d, la week del panel es L–V", len(week))
+	if len(week) != 6 {
+		t.Fatalf("días = %d, la week del panel es L–S", len(week))
 	}
 	if week[0].Format("2006-01-02") != "2026-08-10" {
 		t.Errorf("empieza en %s, se esperaba el lunes 10", week[0].Format("2006-01-02"))
 	}
-	if week[4].Format("2006-01-02") != "2026-08-14" {
-		t.Errorf("termina en %s, se esperaba el viernes 14", week[4].Format("2006-01-02"))
+	if week[5].Format("2006-01-02") != "2026-08-15" {
+		t.Errorf("termina en %s, se esperaba el sábado 15", week[5].Format("2006-01-02"))
 	}
 }
 
@@ -36,9 +36,9 @@ func TestSemanaLaboralDesdeUnDomingo(t *testing.T) {
 	}
 }
 
-func TestFinDeSemanaNoEsLaborable(t *testing.T) {
-	if IsWorkday(dia("2026-08-15"), nil, nil) { // sábado
-		t.Error("el sábado no cuenta para el control")
+func TestSoloElDomingoNoEsLaborable(t *testing.T) {
+	if !IsWorkday(dia("2026-08-15"), nil, nil) { // sábado
+		t.Error("el sábado cuenta para el control")
 	}
 	if IsWorkday(dia("2026-08-16"), nil, nil) { // domingo
 		t.Error("el domingo no cuenta")
@@ -58,8 +58,8 @@ func TestFeriadoNoEsAusencia(t *testing.T) {
 
 func TestDiasLaborablesDeUnaSemana(t *testing.T) {
 	days := Workdays(dia("2026-08-10"), dia("2026-08-16"), nil)
-	if len(days) != 5 {
-		t.Errorf("= %v, se esperaban 5 días", days)
+	if len(days) != 6 {
+		t.Errorf("= %v, se esperaban 6 días", days)
 	}
 }
 

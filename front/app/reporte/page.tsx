@@ -143,7 +143,7 @@ function Reporte() {
         <b>Resumen de la semana</b>
         <div className="dato">
           <span>Días trabajados</span>
-          <span>{doc.summary.daysOk} de 5</span>
+          <span>{doc.summary.daysOk} de {doc.days.length}</span>
         </div>
         <div className="dato">
           <span>Incidencias</span>

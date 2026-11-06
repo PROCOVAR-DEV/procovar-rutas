@@ -352,12 +352,12 @@ export function diasEntre(desde: string, hasta: string): string[] {
   return dias.slice(0, 62);
 }
 
-/** Monday to Friday of the week containing the date. The working week is Mon–Fri. */
+/** Monday to Saturday of the week containing the date. The working week is Mon–Sat. */
 export function workWeek(iso: string): string[] {
   const d = new Date(`${iso}T12:00:00Z`);
   const isoDay = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
   const monday = new Date(d.getTime() - (isoDay - 1) * 86400000);
-  return Array.from({ length: 5 }, (_, i) =>
+  return Array.from({ length: 6 }, (_, i) =>
     new Date(monday.getTime() + i * 86400000).toISOString().slice(0, 10),
   );
 }
