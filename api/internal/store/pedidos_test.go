@@ -2,9 +2,11 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/procovar/procovar-rutas/api/internal/store"
 	"github.com/procovar/procovar-rutas/api/internal/testdb"
@@ -65,6 +67,13 @@ func TestConsultasDePedidosCorren(t *testing.T) {
 		{"SellersForMatch", func() error {
 			_, err := q.SellersForMatch(ctx)
 			return err
+		}},
+		{"BranchByCode", func() error {
+			c := "no-existe"
+			if _, err := q.BranchByCode(ctx, &c); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+			return nil
 		}},
 		{"UnlinkedVendors", func() error {
 			_, err := q.UnlinkedVendors(ctx, "")

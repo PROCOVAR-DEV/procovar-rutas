@@ -303,6 +303,30 @@ func (q *Queries) BranchByID(ctx context.Context, id string) (Branch, error) {
 	return i, err
 }
 
+const branchByCode = `-- name: BranchByCode :one
+SELECT id, auth_org_id, nombre, activa, timezone, created_at, updated_at, clave, codigo FROM sucursal WHERE codigo = $1 LIMIT 1
+`
+
+// Por el CÓDIGO que PEDIDO da a su sucursal (CAM, GR, PLS…). La clave sale del nombre de
+// la cuenta de Drive y no siempre coincide con el de PEDIDO: allí es «Granma» y aquí
+// «Bayamo»; allí «Palma Soriano» y aquí «Palma».
+func (q *Queries) BranchByCode(ctx context.Context, code *string) (Branch, error) {
+	row := q.db.QueryRow(ctx, branchByCode, code)
+	var i Branch
+	err := row.Scan(
+		&i.ID,
+		&i.AuthOrgID,
+		&i.Name,
+		&i.Active,
+		&i.Timezone,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Clave,
+		&i.Code,
+	)
+	return i, err
+}
+
 const branchByKey = `-- name: BranchByKey :one
 
 SELECT id, auth_org_id, nombre, activa, timezone, created_at, updated_at, clave, codigo FROM sucursal WHERE clave = $1 LIMIT 1

@@ -253,6 +253,12 @@ RETURNING *;
 -- y todas tienen que caer en la misma fila.
 SELECT * FROM sucursal WHERE clave = @key LIMIT 1;
 
+-- name: BranchByCode :one
+-- Por el CÓDIGO que PEDIDO da a su sucursal (CAM, GR, PLS…). La clave sale del nombre de
+-- la cuenta de Drive y no siempre coincide con el de PEDIDO: allí es «Granma» y aquí
+-- «Bayamo»; allí «Palma Soriano» y aquí «Palma».
+SELECT * FROM sucursal WHERE codigo = @code LIMIT 1;
+
 -- name: CreateBranchByKey :one
 -- Si dos empujes llegan a la vez, el segundo choca con el índice único y se queda con
 -- la que creó el primero, en vez de abrir otra. Así aparecieron siete "Guantánamo".

@@ -576,12 +576,22 @@ func (s *Service) sucursalDe(ctx context.Context, p Order, cache map[string]stri
 		return id, nil
 	}
 
-	suc, err := s.q.BranchByKey(ctx, clave)
+	// Primero por el CÓDIGO, que es el de Accesos y el que usa PEDIDO (CAM, GR, PLS…): el
+	// nombre no es de fiar —«Granma» allí es «Bayamo» aquí— y por eso los vendedores y los
+	// pedidos de esa sucursal se descartaban. La clave queda de respaldo.
+	var suc store.Branch
+	var err error
+	if codigo != "" {
+		suc, err = s.q.BranchByCode(ctx, &codigo)
+	}
+	if codigo == "" || err != nil {
+		suc, err = s.q.BranchByKey(ctx, clave)
+	}
 	if err != nil {
 		// NO se crea la sucursal: las de aquí nacen de Drive, y una inventada desde
 		// PEDIDO sería una sucursal sin carpetas, sin vendedores y sin rutas que
 		// solo serviría para ensuciar el panel.
-		return "", fmt.Errorf("no hay sucursal con clave %q (de %q)", clave, nombre)
+		return "", fmt.Errorf("no hay sucursal con código %q ni clave %q (de %q)", codigo, clave, nombre)
 	}
 
 	if codigo != "" {

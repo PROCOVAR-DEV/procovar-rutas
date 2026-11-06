@@ -22,7 +22,7 @@
 import { useCallback, useEffect, useState } from "react";
 import SinPermiso from "@/components/SinPermiso";
 import { useSesion } from "@/components/Sesion";
-import { agruparPorSucursal, haceFaltaAgrupar } from "@/lib/porSucursal";
+import { agruparPorSucursal, guardarPlegadas, haceFaltaAgrupar, leerPlegadas } from "@/lib/porSucursal";
 import { useEvents } from "@/lib/events";
 import { ask, borrar, enviar, type Seller } from "@/lib/api";
 
@@ -132,6 +132,22 @@ export default function Revisar() {
   const [sinCarpetas, setSinCarpetas] = useState<string | null>(null);
   const [sinAccesos, setSinAccesos] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Qué sucursales están ABIERTAS. Aquí, al revés que en el calendario, nace todo cerrado:
+  // son listas de cien filas y ver «todo de golpe» es justo lo que no sirve. Se recuerda
+  // en el navegador lo que cada quien abre.
+  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
+
+  useEffect(() => setAbiertas(leerPlegadas("revisar-abiertas")), []);
+
+  const alternar = (clave: string) =>
+    setAbiertas((antes) => {
+      const ahora = new Set(antes);
+
+      if (ahora.has(clave)) ahora.delete(clave);
+      else ahora.add(clave);
+      guardarPlegadas("revisar-abiertas", ahora);
+      return ahora;
+    });
 
   const cargar = useCallback(() => {
     ask<Revision>("/api/review")
@@ -408,18 +424,22 @@ export default function Revisar() {
               <tbody>
                 {carpetasPorSucursal.flatMap((grupo) => {
                   const sinColocar = grupo.filas.filter((g) => g.sellerId === "").length;
+                  const clave = `gps|${grupo.nombre}`;
+                  const abierta = !agruparCarpetas || abiertas.has(clave);
 
                   return (agruparCarpetas ? [(
                     <tr className="fila-sucursal" key={`s:${grupo.nombre}`}>
                       <th colSpan={4}>
-                        {grupo.nombre}
-                        <span className="fila-sucursal-cuenta">{grupo.filas.length} GPS</span>
-                        {sinColocar > 0 && (
-                          <span className="fila-sucursal-alerta">{sinColocar} sin asignar</span>
-                        )}
+                        <CabeceraSucursal
+                          nombre={grupo.nombre}
+                          abierta={abierta}
+                          alPulsar={() => alternar(clave)}
+                          cuenta={`${grupo.filas.length} GPS`}
+                          alerta={sinColocar > 0 ? `${sinColocar} sin asignar` : ""}
+                        />
                       </th>
                     </tr>
-                  )] : []).concat(grupo.filas.map((g) => (
+                  )] : []).concat((abierta ? grupo.filas : []).map((g) => (
                   <tr key={g.id} data-sinduenno={g.sellerId === ""}>
                     <td>
                       {g.name}
@@ -490,18 +510,22 @@ export default function Revisar() {
               <tbody>
                 {vendedoresPorSucursal.flatMap((grupo) => {
                   const sinEmparejar = grupo.filas.filter((v) => v.sellerId === "").length;
+                  const clave = `vendedores|${grupo.nombre}`;
+                  const abierta = !agruparVendedores || abiertas.has(clave);
 
                   return (agruparVendedores ? [(
                     <tr className="fila-sucursal" key={`s:${grupo.nombre}`}>
                       <th colSpan={4}>
-                        {grupo.nombre}
-                        <span className="fila-sucursal-cuenta">{grupo.filas.length} vendedores</span>
-                        {sinEmparejar > 0 && (
-                          <span className="fila-sucursal-alerta">{sinEmparejar} sin emparejar</span>
-                        )}
+                        <CabeceraSucursal
+                          nombre={grupo.nombre}
+                          abierta={abierta}
+                          alPulsar={() => alternar(clave)}
+                          cuenta={`${grupo.filas.length} vendedores`}
+                          alerta={sinEmparejar > 0 ? `${sinEmparejar} sin emparejar` : ""}
+                        />
                       </th>
                     </tr>
-                  )] : []).concat(grupo.filas.map((v) => (
+                  )] : []).concat((abierta ? grupo.filas : []).map((v) => (
                   <tr key={v.ref} data-sinduenno={v.sellerId === ""}>
                     <td>{v.name}</td>
                     <td className="pv-codigo">{v.code}</td>
@@ -740,6 +764,30 @@ function FilaRota({
       )}
       {fallo && <p className="aviso">{fallo}</p>}
     </div>
+  );
+}
+
+/** La franja de una sucursal: toda ella es el botón que la abre o la cierra. */
+function CabeceraSucursal({
+  nombre,
+  abierta,
+  alPulsar,
+  cuenta,
+  alerta,
+}: {
+  nombre: string;
+  abierta: boolean;
+  alPulsar: () => void;
+  cuenta: string;
+  alerta: string;
+}) {
+  return (
+    <button type="button" className="plegador" aria-expanded={abierta} onClick={alPulsar}>
+      <span className="plegador-flecha" data-cerrada={!abierta}>▾</span>
+      {nombre}
+      <span className="fila-sucursal-cuenta">{cuenta}</span>
+      {alerta && <span className="fila-sucursal-alerta">{alerta}</span>}
+    </button>
   );
 }
 
