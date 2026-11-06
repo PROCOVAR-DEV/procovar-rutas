@@ -55,9 +55,9 @@ type Persona struct {
 
 // GET /api/personas — la gente de Accesos que puede llevar un GPS.
 //
-// TODOS los usuarios de Accesos, con cualquier rol: la persona de Accesos es el pivote de Rutas y
-// quien lleva un GPS no siempre es gestor o supervisor. Con el buscador del desplegable la lista
-// larga ya no estorba.
+// Gestores y supervisores: son los que salen a la calle. Un administrador o un
+// gerente no lleva teléfono de ruta, y meterlos en el desplegable es alargar una
+// lista que se usa para elegir deprisa.
 func (s *Server) personas(w http.ResponseWriter, r *http.Request) {
 	c := FromContext(r)
 
@@ -80,7 +80,7 @@ func (s *Server) personas(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	gente, err := s.auth.Members(r.Context(), org, nil)
+	gente, err := s.auth.Members(r.Context(), org, []string{"GESTOR", "SUPERVISOR"})
 	if err != nil {
 		// Que Accesos no conteste no puede dejar la pantalla muda: se dice qué pasó,
 		// porque sin esta lista no se puede asignar nada y hay que saber por qué.
