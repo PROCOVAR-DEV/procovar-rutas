@@ -13,6 +13,10 @@ type falsa []auth.Sucursal
 
 func (f falsa) Sucursales(context.Context) ([]auth.Sucursal, error) { return f, nil }
 
+type gentefalsa []auth.Miembro
+
+func (g gentefalsa) Members(context.Context, string, []string) ([]auth.Miembro, error) { return g, nil }
+
 // «Granma» de Accesos (GR) tiene que caer en la sucursal «Bayamo» que ya salió de Drive, y una
 // sucursal nueva de Accesos tiene que nacer sola; correrlo dos veces no duplica nada.
 func TestSincronizarEnlazaPorCodigoYCreaLasNuevas(t *testing.T) {
@@ -51,3 +55,56 @@ func TestSincronizarEnlazaPorCodigoYCreaLasNuevas(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+// El vendedor de PEDIDO «georlis.cardenas» es el usuario de Accesos del mismo nombre: se enlazan solos,
+// con ficha creada, y un código que no está en Accesos —o es de otra sucursal— se deja sin emparejar.
+func TestEmparejarConAccesosPorUsuario(t *testing.T) {
+	pool := testdb.Open(t)
+	q := store.New(pool)
+	ctx := context.Background()
+
+	suc, err := q.CreateBranchByKey(ctx, store.CreateBranchByKeyParams{ID: "sc", Name: "Camagüey", Key: "camagueytest"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.LinkBranchToAccesos(ctx, store.LinkBranchToAccesosParams{ID: suc.ID, Code: "CAMT", Active: true, AuthOrgID: "org-cam"}); err != nil {
+		t.Fatal(err)
+	}
+	for i, v := range [][2]string{
+		{"georlis.cardenas", "GEORLIS MICHEL CARDENAS MORA"}, // por el usuario
+		{"codigo.raro", "Yoan Domínguez Hidalgo"},            // por el nombre completo
+		{"nadie.mas", "VENDEDOR NADIE"},
+	} {
+		c := v[0]
+		if err := q.UpsertVendor(ctx, store.UpsertVendorParams{
+			ID: "v" + c, BranchID: &suc.ID, Ref: "ref" + c, Code: &c, Name: v[1], Active: true, Orders: int32(i),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	gente := gentefalsa{
+		{ID: "u1", Name: "Georlis", Email: "georlis.cardenas@procovar.cloud", OrganizationID: "org-cam"},
+		{ID: "u2", Name: "YOAN DOMINGUEZ HIDALGO", Email: "yoan.d@procovar.cloud", OrganizationID: "org-cam"},
+	}
+	n, err := EmparejarConAccesos(ctx, q, gente)
+	if err != nil || n != 2 {
+		t.Fatalf("debía emparejar 2 (usuario y nombre), emparejó %d (%v)", n, err)
+	}
+
+	filas, err := q.VendorsWithLink(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range filas {
+		if v.Code == nil {
+			continue
+		}
+		if (*v.Code == "georlis.cardenas" || *v.Code == "codigo.raro") && v.SellerID == "" {
+			t.Fatalf("%s debía quedar emparejado", *v.Code)
+		}
+		if *v.Code == "nadie.mas" && v.SellerID != "" {
+			t.Fatal("nadie.mas no está en Accesos: no se empareja")
+		}
+	}
+}

@@ -39,6 +39,10 @@ func (s *Server) inbox(w http.ResponseWriter, r *http.Request) {
 type assignRequest struct {
 	FileID   string `json:"fileId"`
 	SellerID string `json:"sellerId"`
+	// Lo normal: la persona de Accesos. Se usa su ficha, o se crea en su sucursal.
+	AuthUserID string `json:"authUserId"`
+	BranchID   string `json:"branchId"`
+	PersonName string `json:"personName"`
 	Date     string `json:"date"`
 	// RememberAlias makes the next one resolve on its own. It is what turns the
 	// inbox into work done once per device instead of every single day.
@@ -55,9 +59,32 @@ func (s *Server) assign(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "cuerpo inválido")
 		return
 	}
-	if p.FileID == "" || p.SellerID == "" {
-		respondError(w, http.StatusBadRequest, "faltan el fichero o el vendedor")
+	if p.FileID == "" || (p.SellerID == "" && p.AuthUserID == "") {
+		respondError(w, http.StatusBadRequest, "faltan el fichero o la persona")
 		return
+	}
+
+	if p.SellerID == "" {
+		if t, err := s.q.SellerByAuthID(r.Context(), &p.AuthUserID); err == nil {
+			p.SellerID = t.ID
+		} else {
+			if p.BranchID == "" {
+				respondError(w, http.StatusBadRequest, "esa persona no tiene sucursal enlazada")
+				return
+			}
+			if c.Role != "super_admin" && c.BranchID != "" && c.BranchID != p.BranchID {
+				respondError(w, http.StatusForbidden, "sin acceso a esa sucursal")
+				return
+			}
+			t, err := s.q.CreateSellerFromAuth(r.Context(), store.CreateSellerFromAuthParams{
+				ID: newID(), Name: p.PersonName, BranchID: p.BranchID, AuthUserID: &p.AuthUserID,
+			})
+			if err != nil {
+				s.fail(w, "creando la ficha", err)
+				return
+			}
+			p.SellerID = t.ID
+		}
 	}
 
 	trab, err := s.q.SellerByID(r.Context(), p.SellerID)

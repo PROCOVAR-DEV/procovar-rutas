@@ -28,7 +28,7 @@ import ColaGps from "./ColaGps";
 import Filtros, { Segmentos } from "./Filtros";
 import type { Carpeta, Persona } from "./tipos";
 import { useEvents } from "@/lib/events";
-import { ask, borrar, enviar, type Seller } from "@/lib/api";
+import { ask, enviar } from "@/lib/api";
 
 interface FicheroAtascado {
   id: string;
@@ -105,7 +105,6 @@ const QUE_HACER: Record<string, string> = {
 export default function Revisar() {
   const { cargando, vetado, puede } = useSesion();
   const [datos, setDatos] = useState<Revision | null>(null);
-  const [vendedores, setVendedores] = useState<Seller[]>([]);
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   // Por qué no hay carpetas: «no hay ninguna» y «no se pudieron traer» se veían igual
@@ -120,9 +119,6 @@ export default function Revisar() {
     ask<Revision>("/api/review")
       .then(setDatos)
       .catch((e) => setError((e as Error).message));
-    ask<Seller[]>("/api/sellers")
-      .then((v) => setVendedores(v ?? []))
-      .catch(() => setVendedores([]));
     ask<Carpeta[]>("/api/gps")
       .then((g) => { setCarpetas(g ?? []); setSinCarpetas(null); })
       .catch((e) => { setCarpetas([]); setSinCarpetas((e as Error).message); });
@@ -273,7 +269,7 @@ export default function Revisar() {
                 solos.
               </p>
               {colocables.map((f) => (
-                <FilaFichero key={f.id} fichero={f} vendedores={vendedores} alAsignar={cargar} />
+                <FilaFichero key={f.id} fichero={f} personas={personas} alAsignar={cargar} />
               ))}
             </div>
           )}
@@ -470,11 +466,12 @@ function ColaSinSubir({ sucursal, callados: todos }: { sucursal: string; callado
 
 function FilaFichero({
   fichero,
-  vendedores,
+  personas,
   alAsignar,
 }: {
   fichero: FicheroAtascado;
-  vendedores: Seller[];
+  /** La gente de Accesos: de ahí se elige. */
+  personas: Persona[];
   alAsignar: () => void;
 }) {
   const [seller, setVendedor] = useState("");
@@ -484,12 +481,16 @@ function FilaFichero({
 
   async function asignar() {
     if (!seller) return;
+    const persona = personas.find((p) => p.authUserId === seller);
+
     setGuardando(true);
     setFallo(null);
     try {
       await enviar("/api/inbox/assign", {
         fileId: fichero.id,
-        sellerId: seller,
+        authUserId: seller,
+        branchId: persona?.branchId ?? "",
+        personName: persona?.name ?? "",
         fecha: fecha || null,
         rememberAlias: true,
         alias: "",
@@ -516,9 +517,10 @@ function FilaFichero({
       <div className="controles">
         <select value={seller} onChange={(e) => setVendedor(e.target.value)}>
           <option value="">¿De quién es?</option>
-          {vendedores.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
+          {personas.map((p) => (
+            <option key={p.authUserId} value={p.authUserId}>
+              {p.name || p.email}
+              {p.branch ? ` · ${p.branch}` : ""}
             </option>
           ))}
         </select>

@@ -71,14 +71,27 @@ func Sincronizar(ctx context.Context, q *store.Queries, fuente Fuente) (int, err
 	return n, nil
 }
 
-// Mantener sincroniza ahora y cada `cada`. Un fallo de Accesos se avisa y se reintenta en la
+// Accesos es lo que hace falta de procovar-auth: sus sucursales y su gente.
+type Accesos interface {
+	Fuente
+	Gente
+}
+
+// Mantener sincroniza ahora y cada `cada`: primero las sucursales y luego el emparejado de los
+// vendedores de PEDIDO con los usuarios de Accesos. Un fallo de Accesos se avisa y se reintenta en la
 // siguiente vuelta: Rutas sigue sirviendo con lo que ya tenía.
-func Mantener(ctx context.Context, q *store.Queries, fuente Fuente, log *slog.Logger, cada time.Duration) {
+func Mantener(ctx context.Context, q *store.Queries, accesos Accesos, log *slog.Logger, cada time.Duration) {
 	vuelta := func() {
-		if n, err := Sincronizar(ctx, q, fuente); err != nil {
+		if n, err := Sincronizar(ctx, q, accesos); err != nil {
 			log.Warn("no se pudieron sincronizar las sucursales con Accesos", "error", err)
+			return
 		} else {
 			log.Info("sucursales al día con Accesos", "sucursales", n)
+		}
+		if n, err := EmparejarConAccesos(ctx, q, accesos); err != nil {
+			log.Warn("no se pudo emparejar a los vendedores con Accesos", "error", err)
+		} else if n > 0 {
+			log.Info("vendedores de PEDIDO emparejados con su usuario de Accesos", "vendedores", n)
 		}
 	}
 
