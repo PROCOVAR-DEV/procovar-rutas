@@ -153,6 +153,29 @@ export default function Personas() {
             ))}
           </ul>
         )}
+
+      {(() => {
+        const huerfanos = vendedores.filter((v) => v.sellerId === "" && (!sucursal || v.branch === sucursal));
+
+        return huerfanos.length > 0 ? (
+          <details className="huerfanos">
+            <summary>
+              {huerfanos.length} vendedores de PEDIDO no casan con nadie de Accesos
+            </summary>
+            <p className="sub">
+              Su código y su nombre no coinciden con ningún usuario. Si son personas que siguen, se enlazan desde la
+              fila de su usuario; si ya no están, no hay nada que hacer aquí.
+            </p>
+            <ul className="huerfanos-lista">
+              {huerfanos.map((v) => (
+                <li key={v.ref}>
+                  <b>{v.name}</b> <span className="gps-meta">{v.code} · {v.branch} · {v.orders} pedidos</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null;
+      })()}
       </section>
     </>
   );

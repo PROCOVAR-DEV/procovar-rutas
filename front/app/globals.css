@@ -1648,3 +1648,8 @@ img, svg, video, canvas, table { max-width: 100%; }
 .cola-pestana[aria-selected="true"] .cola-pestana-aviso { background: rgba(255, 255, 255, .22); color: #FFFFFF; }
 .persona-pie { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
 .persona-valor .pv-boton-texto { margin-left: 0.4rem; }
+
+.huerfanos { margin-top: 1.25rem; font-size: 13.5px; }
+.huerfanos summary { cursor: pointer; color: var(--pv-tinta-suave); }
+.huerfanos-lista { margin: 0.5rem 0 0; padding-left: 1.1rem; columns: 2; column-gap: 2rem; }
+@media (max-width: 860px) { .huerfanos-lista { columns: 1; } }
