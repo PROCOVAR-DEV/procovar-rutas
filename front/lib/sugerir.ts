@@ -64,3 +64,16 @@ export function sugerirGps<S extends { name: string }>(
 
   return candidatos.length === 1 ? candidatos[0] : null;
 }
+
+/**
+ * Qué vendedores de PEDIDO pueden ser esta persona de Accesos: cada palabra del nombre/usuario de la
+ * persona tiene que ser el principio de una del vendedor. Si sale uno solo, se sugiere.
+ */
+export function vendedoresDe<V extends { name: string; code: string }>(
+  persona: { name: string; email: string },
+  vendedores: V[],
+): V[] {
+  const yo = [{ name: `${persona.name} ${persona.email.split("@")[0] ?? ""}` }];
+
+  return vendedores.filter((v) => sugerirGps(v, yo) !== null);
+}

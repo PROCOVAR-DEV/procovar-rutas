@@ -1566,3 +1566,43 @@ func (q *Queries) UpdateSourceCursor(ctx context.Context, arg UpdateSourceCursor
 	_, err := q.db.Exec(ctx, updateSourceCursor, arg.ID, arg.ModifiedCursor)
 	return err
 }
+
+const clearSourceSeller = `-- name: ClearSourceSeller :exec
+UPDATE drive_source SET trabajador_id = NULL, updated_at = now() WHERE id = $1
+`
+
+// Desvincular un GPS de su persona: la carpeta sigue ahí, sin dueño. Lo que ya subió se queda.
+func (q *Queries) ClearSourceSeller(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, clearSourceSeller, id)
+	return err
+}
+
+const setSellerActive = `-- name: SetSellerActive :exec
+UPDATE trabajador
+SET activo = $2,
+    hasta = CASE WHEN $2 THEN NULL ELSE current_date END,
+    updated_at = now()
+WHERE id = $1
+`
+
+type SetSellerActiveParams struct {
+	ID     string
+	Active bool
+}
+
+// Dar de baja (o de alta) a alguien en Rutas. De baja deja de salir como «va a subir» y no cuenta
+// como falta; su histórico se queda. `hasta` marca desde cuándo no se le espera.
+func (q *Queries) SetSellerActive(ctx context.Context, arg SetSellerActiveParams) error {
+	_, err := q.db.Exec(ctx, setSellerActive, arg.ID, arg.Active)
+	return err
+}
+
+const deactivateSourcesOfSeller = `-- name: DeactivateSourcesOfSeller :exec
+UPDATE drive_source SET activa = FALSE, updated_at = now() WHERE trabajador_id = $1
+`
+
+// Las carpetas de alguien dado de baja dejan de barrerse.
+func (q *Queries) DeactivateSourcesOfSeller(ctx context.Context, sellerID *string) error {
+	_, err := q.db.Exec(ctx, deactivateSourcesOfSeller, sellerID)
+	return err
+}

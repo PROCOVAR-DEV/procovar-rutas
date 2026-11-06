@@ -1557,3 +1557,94 @@ img, svg, video, canvas, table { max-width: 100%; }
 
 /* El buscador del calendario, junto a los demás controles. */
 .controles-buscar { flex: 0 1 240px; margin-left: auto; height: 34px; }
+
+/* PERSONAS: una fila por persona de Accesos, con su GPS y su vendedor de PEDIDO en columnas. */
+.persona {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.1fr) minmax(220px, 1fr) minmax(220px, 1fr);
+    gap: 0.4rem 1.25rem;
+    align-items: start;
+    padding: 0.75rem 1rem 0.75rem 0.9rem;
+    border-bottom: 1px solid var(--pv-trazo-tenue);
+    border-left: 3px solid transparent;
+}
+.persona:last-child { border-bottom: 0; }
+.persona:hover { background: var(--pv-azul-tinte); }
+.persona[data-completo="false"] { border-left-color: var(--pv-ambar); }
+.persona-quien { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.persona-celda { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.persona-rotulo {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--pv-tinta-suave);
+}
+.persona-valor { font-weight: 600; overflow-wrap: anywhere; }
+.persona-valor .gps-meta { font-weight: 400; }
+.persona-accion { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; font-size: 13.5px; }
+.persona-accion select {
+    min-width: 170px;
+    max-width: 100%;
+    height: 32px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio);
+    background: var(--pv-blanco);
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13px;
+}
+.persona-fallo { grid-column: 1 / -1; }
+@media (max-width: 860px) { .persona { grid-template-columns: 1fr; } }
+
+/* El desplegable con buscador. */
+.combo { position: relative; display: inline-block; min-width: 230px; max-width: 100%; }
+.combo-entrada {
+    width: 100%;
+    height: 32px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio);
+    background: var(--pv-blanco);
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13px;
+    text-overflow: ellipsis;
+}
+.combo-entrada::placeholder { color: var(--pv-tinta-suave); opacity: 1; }
+.combo-entrada[data-con-valor="true"]::placeholder { color: var(--pv-tinta); font-weight: 600; }
+.combo-entrada:focus-visible { outline: 2px solid var(--pv-azul); outline-offset: -1px; }
+.combo-flecha { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--pv-tinta-suave); font-size: 11px; pointer-events: none; }
+.combo-lista {
+    position: absolute;
+    z-index: 60;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    width: max-content;
+    max-width: 360px;
+    max-height: 260px;
+    margin: 0;
+    padding: 4px;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio-grande);
+    background: var(--pv-blanco);
+    box-shadow: 0 8px 24px rgba(15, 21, 24, .14);
+}
+.combo-opcion { display: flex; justify-content: space-between; gap: 1rem; padding: 7px 10px; border-radius: var(--pv-radio); font-size: 13px; cursor: pointer; }
+.combo-opcion[data-activa="true"] { background: var(--pv-azul-tinte); }
+.combo-opcion[aria-selected="true"] { font-weight: 600; }
+.combo-detalle { color: var(--pv-tinta-suave); font-size: 12px; white-space: nowrap; }
+.combo-vacio { padding: 10px; color: var(--pv-tinta-suave); font-size: 13px; }
+/* La lista no puede recortarse: el desplegable sale por fuera de la última fila. */
+.lista { overflow: visible; }
+.lista > li:first-child { border-top-left-radius: var(--pv-radio-grande); border-top-right-radius: var(--pv-radio-grande); }
+.lista > li:last-child { border-bottom-left-radius: var(--pv-radio-grande); border-bottom-right-radius: var(--pv-radio-grande); }
+
+.cola-pestana-aviso { padding: 1px 8px; border-radius: 999px; background: var(--pv-cuno-tinte); color: var(--pv-cuno); font-size: 12px; font-weight: 500; }
+.cola-pestana[aria-selected="true"] .cola-pestana-aviso { background: rgba(255, 255, 255, .22); color: #FFFFFF; }
+.persona-pie { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+.persona-valor .pv-boton-texto { margin-left: 0.4rem; }

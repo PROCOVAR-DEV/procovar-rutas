@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { borrar, enviar } from "@/lib/api";
 import { agruparPorSucursal } from "@/lib/porSucursal";
 import { sugerirPersona } from "@/lib/sugerir";
+import Combobox from "@/components/Combobox";
 import Filtros, { Segmentos } from "./Filtros";
 import type { Carpeta, Persona } from "./tipos";
 
@@ -180,19 +181,37 @@ function FilaGps({
     }
   }
 
-  async function quitar() {
-    const aviso =
-      `¿Quitar la carpeta «${carpeta.name}»? Deja de barrerse y sale de esta lista. ` +
-      `Lo que ya subió se conserva.`;
+  // Dar de baja: lo que ya no sube. Si tiene dueño, se da de baja a la persona en rutas (y todas sus
+  // carpetas dejan de barrerse); si no, solo la carpeta. El histórico se conserva y deja de salir como «va a subir».
+  async function darDeBaja() {
+    const aviso = carpeta.sellerId
+      ? `¿Dar de baja de rutas a ${carpeta.seller}? Dejará de salir como «va a subir» y sus carpetas no se barrerán. Lo que ya subió se conserva.`
+      : `¿Dar de baja la carpeta «${carpeta.name}»? Deja de barrerse y sale de esta lista. Lo que ya subió se conserva.`;
 
     if (!window.confirm(aviso)) return;
     setTrabajando(true);
     setFallo(null);
     try {
-      await borrar(`/api/sources/${carpeta.id}`);
+      if (carpeta.sellerId) await enviar(`/api/sellers/${carpeta.sellerId}/baja`, {});
+      else await borrar(`/api/sources/${carpeta.id}`);
       alCambiar();
     } catch (e) {
       setFallo((e as Error).message);
+      setTrabajando(false);
+    }
+  }
+
+  // Desvincular: quitarle el dispositivo a su persona. La carpeta se queda, sin dueño.
+  async function desvincular() {
+    if (!window.confirm(`¿Quitarle «${carpeta.name}» a ${carpeta.seller}? El GPS queda sin dueño; lo que ya subió se queda con ${carpeta.seller}.`)) return;
+    setTrabajando(true);
+    setFallo(null);
+    try {
+      await enviar(`/api/gps/${carpeta.id}/desvincular`, {});
+      alCambiar();
+    } catch (e) {
+      setFallo((e as Error).message);
+    } finally {
       setTrabajando(false);
     }
   }
@@ -218,9 +237,14 @@ function FilaGps({
           <>
             <span className="gps-persona">{carpeta.seller}</span>
             {puedeAsignar && (
-              <button className="pv-boton-texto" onClick={() => setCambiando(true)}>
-                Cambiar
-              </button>
+              <>
+                <button className="pv-boton-texto" onClick={() => setCambiando(true)}>
+                  Cambiar
+                </button>
+                <button className="pv-boton-texto" disabled={trabajando} onClick={desvincular}>
+                  Desvincular
+                </button>
+              </>
             )}
           </>
         ) : !puedeAsignar ? (
@@ -245,19 +269,17 @@ function FilaGps({
           </>
         ) : (
           <>
-            <select
-              value={quien}
-              onChange={(e) => setQuien(e.target.value)}
-              aria-label={`¿De quién es ${carpeta.name}?`}
-            >
-              <option value="">¿De quién es?</option>
-              {lista.map((p) => (
-                <option key={p.authUserId} value={p.authUserId}>
-                  {p.name || p.email}
-                  {p.roles.length > 0 ? ` · ${p.roles.join(", ").toLowerCase()}` : ""}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              etiqueta={`¿De quién es ${carpeta.name}?`}
+              placeholder="Buscar persona…"
+              valor={quien}
+              alElegir={setQuien}
+              opciones={lista.map((p) => ({
+                valor: p.authUserId,
+                etiqueta: p.name || p.email,
+                detalle: p.roles.join(", ").toLowerCase(),
+              }))}
+            />
             <button
               className="pv-boton pv-boton-primario pv-boton-corto"
               disabled={!quien || trabajando}
@@ -282,8 +304,8 @@ function FilaGps({
       </div>
 
       {puedeQuitar && !hecho && (
-        <button className="pv-boton-texto gps-quitar" disabled={trabajando} onClick={quitar}>
-          Quitar
+        <button className="pv-boton-texto gps-quitar" disabled={trabajando} onClick={darDeBaja}>
+          Dar de baja
         </button>
       )}
     </li>

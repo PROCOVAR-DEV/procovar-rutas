@@ -131,6 +131,8 @@ func (s *Server) Routes() http.Handler {
 		// La gente de Accesos, que es de donde salen las personas de verdad.
 		r.With(Exige(PermCalendario)).Get("/personas", s.personas)
 		r.With(Exige(PermAlias)).Post("/gps/{id}/asignar", s.assignGps)
+		r.With(Exige(PermAlias)).Post("/gps/{id}/desvincular", s.unassignGps)
+		r.With(Exige(PermCarpeta)).Post("/sellers/{id}/baja", s.bajaSeller)
 
 		// Dar de alta y de baja una carpeta va con SU llave, fuera del grupo de
 		// Administración. Estaban dentro, así que hacía falta también la de

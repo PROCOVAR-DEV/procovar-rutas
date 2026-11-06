@@ -24,6 +24,7 @@ import SinPermiso from "@/components/SinPermiso";
 import { useSesion, useSucursal } from "@/components/Sesion";
 import { agruparPorSucursal } from "@/lib/porSucursal";
 import { sugerirGps } from "@/lib/sugerir";
+import Combobox from "@/components/Combobox";
 import ColaGps from "./ColaGps";
 import Filtros, { Segmentos } from "./Filtros";
 import type { Carpeta, Persona } from "./tipos";
@@ -172,15 +173,29 @@ export default function Revisar() {
 
   const colas = [
     ...(puede("rutas.alias")
-      ? [{ clave: "gps", titulo: "GPS sin dueño", n: sinDueno.filter(deLaElegida).length }]
+      ? [{
+          clave: "gps",
+          titulo: "GPS",
+          // El total, para gestionarlos TODOS; lo que falta por asignar va marcado aparte.
+          n: carpetas.filter(deLaElegida).length,
+          pendientes: sinDueno.filter(deLaElegida).length,
+        }]
       : []),
     ...(puede("rutas.alias") && (datos.vendors?.length ?? 0) > 0
-      ? [{ clave: "pedido", titulo: "Vendedores sin emparejar", n: sinDuenno.filter(deLaElegida).length }]
+      ? [{ clave: "pedido", titulo: "Vendedores sin emparejar", n: sinDuenno.filter(deLaElegida).length, pendientes: sinDuenno.filter(deLaElegida).length }]
       : []),
-    { clave: "sinsubir", titulo: "Sin subir", n: callados.filter((c) => !sucursal || c.branchName === sucursal).length },
-    { clave: "ficheros", titulo: "Ficheros con problema", n: nFicheros },
+    {
+      clave: "sinsubir",
+      titulo: "Sin subir",
+      n: callados.filter((c) => !sucursal || c.branchName === sucursal).length,
+      pendientes: callados.filter((c) => !sucursal || c.branchName === sucursal).length,
+    },
+    { clave: "ficheros", titulo: "Ficheros con problema", n: nFicheros, pendientes: nFicheros },
   ];
-  const actual = colas.find((c) => c.clave === cola) ?? colas.find((c) => c.n > 0) ?? colas[0];
+  const actual =
+    colas.find((c) => c.clave === cola) ??
+    colas.find((c) => c.pendientes > 0) ??
+    colas[0];
 
   return (
     <>
@@ -205,11 +220,14 @@ export default function Revisar() {
             role="tab"
             aria-selected={actual.clave === c.clave}
             className="cola-pestana"
-            data-pendiente={c.n > 0}
+            data-pendiente={c.pendientes > 0}
             onClick={() => setCola(c.clave)}
           >
             <span className="cola-pestana-n">{c.n}</span>
             {c.titulo}
+            {c.clave === "gps" && c.pendientes > 0 && (
+              <span className="cola-pestana-aviso">{c.pendientes} sin dueño</span>
+            )}
           </button>
         ))}
       </nav>
@@ -235,7 +253,7 @@ export default function Revisar() {
         <ColaPedido sucursal={sucursal} vendors={datos.vendors ?? []} personas={personas} alEmparejar={cargar} />
       )}
 
-      {actual.clave === "sinsubir" && <ColaSinSubir sucursal={sucursal} callados={callados} />}
+      {actual.clave === "sinsubir" && <ColaSinSubir sucursal={sucursal} callados={callados} puedeBaja={puede("rutas.carpeta")} alCambiar={cargar} />}
 
       {actual.clave === "ficheros" && (
         <section className="cola">
@@ -419,8 +437,46 @@ function ColaPedido({
   );
 }
 
+/** Dar de baja de rutas a alguien que ya no sube: deja de salir como «va a subir» y su histórico se conserva. */
+function BajaDeRutas({ id, nombre, alCambiar }: { id: string; nombre: string; alCambiar: () => void }) {
+  const [trabajando, setTrabajando] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
+
+  async function baja() {
+    if (!window.confirm(`¿Dar de baja de rutas a ${nombre}? Dejará de salir como «va a subir». Lo que ya subió se conserva.`)) return;
+    setTrabajando(true);
+    setFallo(null);
+    try {
+      await enviar(`/api/sellers/${id}/baja`, {});
+      alCambiar();
+    } catch (e) {
+      setFallo((e as Error).message);
+      setTrabajando(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="pv-boton-texto gps-quitar" disabled={trabajando} onClick={baja}>
+        {trabajando ? "…" : "Dar de baja"}
+      </button>
+      {fallo && <span className="gps-error">{fallo}</span>}
+    </>
+  );
+}
+
 /** Quién lleva días sin subir: o no lleva el GPS encendido, o dejó de subir. Más de 3 días es un teléfono que hay que ir a mirar. */
-function ColaSinSubir({ sucursal, callados: todos }: { sucursal: string; callados: VendedorCallado[] }) {
+function ColaSinSubir({
+  sucursal,
+  callados: todos,
+  puedeBaja,
+  alCambiar,
+}: {
+  sucursal: string;
+  callados: VendedorCallado[];
+  puedeBaja: boolean;
+  alCambiar: () => void;
+}) {
   const [busqueda, setBusqueda] = useState("");
   const q = busqueda.trim().toLowerCase();
   const callados = sucursal ? todos.filter((c) => c.branchName === sucursal) : todos;
@@ -456,6 +512,7 @@ function ColaSinSubir({ sucursal, callados: todos }: { sucursal: string; callado
               </span>
               {!c.linked && <span className="sub">sin emparejar con PEDIDO</span>}
             </div>
+            {puedeBaja && <BajaDeRutas id={c.sellerId} nombre={c.seller} alCambiar={alCambiar} />}
           </li>
         ))}
       </ul>
@@ -515,15 +572,17 @@ function FilaFichero({
         {fichero.error && <span className="aviso">{fichero.error}</span>}
       </div>
       <div className="controles">
-        <select value={seller} onChange={(e) => setVendedor(e.target.value)}>
-          <option value="">¿De quién es?</option>
-          {personas.map((p) => (
-            <option key={p.authUserId} value={p.authUserId}>
-              {p.name || p.email}
-              {p.branch ? ` · ${p.branch}` : ""}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          etiqueta={`¿De quién es ${fichero.name}?`}
+          placeholder="Buscar persona…"
+          valor={seller}
+          alElegir={setVendedor}
+          opciones={personas.map((p) => ({
+            valor: p.authUserId,
+            etiqueta: p.name || p.email,
+            detalle: p.branch,
+          }))}
+        />
         <input
           className="pv-campo"
           type="date"
@@ -621,19 +680,17 @@ function ElegirVendedor({
 
   return (
     <>
-      <select
-        value={quien}
-        onChange={(e) => setQuien(e.target.value)}
-        aria-label={`¿Quién es ${vendedor.name} en Accesos?`}
-      >
-        <option value="">¿Quién es en Accesos?</option>
-        {lista.map((p) => (
-          <option key={p.authUserId} value={p.authUserId}>
-            {p.name || p.email}
-            {p.roles.length > 0 ? ` · ${p.roles.join(", ").toLowerCase()}` : ""}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        etiqueta={`¿Quién es ${vendedor.name} en Accesos?`}
+        placeholder="Buscar persona…"
+        valor={quien}
+        alElegir={setQuien}
+        opciones={lista.map((p) => ({
+          valor: p.authUserId,
+          etiqueta: p.name || p.email,
+          detalle: p.roles.join(", ").toLowerCase(),
+        }))}
+      />
       <button
         className="pv-boton pv-boton-primario pv-boton-corto"
         disabled={!quien || guardando}

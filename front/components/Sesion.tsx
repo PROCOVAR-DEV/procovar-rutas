@@ -159,6 +159,7 @@ export function Sesion({ children }: { children: React.ReactNode }) {
               arreglar. Está en el menú y no solo colgando del calendario porque se
               entra a propósito: «voy a ver qué ficheros hay que volver a subir». */}
           {puede("rutas.calendario") && <Link href="/revisar">Revisar</Link>}
+          {puede("rutas.alias") && <Link href="/personas">Personas</Link>}
         </nav>
 
         {/* Cerrar sesión sale SIEMPRE, aunque no se sepa quién es o no tenga

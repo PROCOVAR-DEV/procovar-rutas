@@ -426,3 +426,20 @@ INSERT INTO trabajador (id, nombre, sucursal_id, auth_user_id)
 VALUES (@id, @name, @branch_id, @auth_user_id)
 ON CONFLICT (auth_user_id) DO UPDATE SET nombre = EXCLUDED.nombre, updated_at = now()
 RETURNING *;
+
+-- name: ClearSourceSeller :exec
+-- Desvincular un GPS de su persona: la carpeta sigue ahí, sin dueño. Lo que ya subió se queda.
+UPDATE drive_source SET trabajador_id = NULL, updated_at = now() WHERE id = @id;
+
+-- name: SetSellerActive :exec
+-- Dar de baja (o de alta) a alguien en Rutas. De baja deja de salir como «va a subir» y no cuenta
+-- como falta; su histórico se queda. `hasta` marca desde cuándo no se le espera.
+UPDATE trabajador
+SET activo = @active,
+    hasta = CASE WHEN @active THEN NULL ELSE current_date END,
+    updated_at = now()
+WHERE id = @id;
+
+-- name: DeactivateSourcesOfSeller :exec
+-- Las carpetas de alguien dado de baja dejan de barrerse.
+UPDATE drive_source SET activa = FALSE, updated_at = now() WHERE trabajador_id = @seller_id;

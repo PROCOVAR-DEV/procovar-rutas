@@ -356,3 +356,61 @@ func (s *Server) resolverPersona(
 	}
 	return t, nil
 }
+
+// POST /api/gps/{id}/desvincular — quitarle el dispositivo a su persona.
+//
+// La carpeta se queda, sin dueño, y lo que ya subió sigue en el histórico de esa persona. Sirve para
+// cuando el teléfono cambia de manos o se asignó mal.
+func (s *Server) unassignGps(w http.ResponseWriter, r *http.Request) {
+	c := FromContext(r)
+	id := chi.URLParam(r, "id")
+
+	fuente, err := s.q.SourceByID(r.Context(), id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "esa carpeta no está")
+		return
+	}
+	if c.Role != "super_admin" && c.BranchID != "" && fuente.BranchID != nil && *fuente.BranchID != c.BranchID {
+		respondError(w, http.StatusForbidden, "esa carpeta es de otra sucursal")
+		return
+	}
+	if err := s.q.ClearSourceSeller(r.Context(), id); err != nil {
+		s.fail(w, "desvinculando la carpeta", err)
+		return
+	}
+
+	s.auth.RecordAudit(r.Context(), "rutas.gps.desvincular", id, c.AuthUserID)
+	s.notify(r, events.Event{Type: events.TypeFile, Detail: "carpeta desvinculada"})
+	respond(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// POST /api/sellers/{id}/baja — dar de baja de rutas a alguien que ya no sube.
+//
+// Deja de salir como «va a subir», no cuenta como falta, y sus carpetas dejan de barrerse. Su
+// histórico se queda. Es lo que quita el ruido de lo que ya no está.
+func (s *Server) bajaSeller(w http.ResponseWriter, r *http.Request) {
+	c := FromContext(r)
+	id := chi.URLParam(r, "id")
+
+	t, err := s.q.SellerByID(r.Context(), id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "ese vendedor no existe")
+		return
+	}
+	if c.Role != "super_admin" && c.BranchID != "" && t.BranchID != c.BranchID {
+		respondError(w, http.StatusForbidden, "ese vendedor es de otra sucursal")
+		return
+	}
+	if err := s.q.DeactivateSourcesOfSeller(r.Context(), &id); err != nil {
+		s.fail(w, "dando de baja sus carpetas", err)
+		return
+	}
+	if err := s.q.SetSellerActive(r.Context(), store.SetSellerActiveParams{ID: id, Active: false}); err != nil {
+		s.fail(w, "dando de baja", err)
+		return
+	}
+
+	s.auth.RecordAudit(r.Context(), "rutas.seller.baja", id, c.AuthUserID)
+	s.notify(r, events.Event{Type: events.TypeFile, Detail: "dado de baja"})
+	respond(w, http.StatusOK, map[string]bool{"ok": true})
+}
