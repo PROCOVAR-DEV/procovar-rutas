@@ -185,3 +185,16 @@ func DateFromName(nombre string) string {
 
 	return ""
 }
+
+// carpetasReservadas son las carpetas que el flujo de n8n crea para guardar lo procesado y lo
+// que falló: no son el GPS de nadie. Una carpeta «ERROR» acabó convertida en un vendedor llamado
+// ERROR que salía en todos los desplegables.
+var carpetasReservadas = map[string]bool{
+	"error": true, "errores": true, "procesados": true, "procesado": true,
+	"gpserror": true, "gpserrores": true, "gpsprocesados": true,
+}
+
+// EsCarpetaReservada dice si ese nombre es el de una carpeta de servicio y no el de una persona.
+func EsCarpetaReservada(nombre string) bool {
+	return carpetasReservadas[Normalize(nombre)]
+}

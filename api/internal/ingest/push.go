@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/procovar/procovar-rutas/api/internal/gpx"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -78,6 +79,15 @@ func (s *Service) Receive(ctx context.Context, e Pushed) (bool, int64, error) {
 		return false, 0, nil
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return false, 0, fmt.Errorf("consultando el fichero: %w", err)
+	}
+
+	// Una carpeta de servicio (ERROR, Procesados…) NO es el GPS de nadie, venga de donde venga: ni se
+	// guarda lo que cuelga de ella ni se da de alta como fuente ni como vendedor. El flujo de n8n
+	// ya las excluye; esto lo garantiza aunque algún día deje de hacerlo.
+	if n := len(e.FolderPath); n > 0 && gpx.EsCarpetaReservada(e.FolderPath[n-1]) {
+		s.log.Info("empuje de una carpeta de servicio: se ignora",
+			"carpeta", e.FolderPath[n-1], "fichero", e.Name)
+		return false, 0, nil
 	}
 
 	source, err := s.findSource(ctx, e)

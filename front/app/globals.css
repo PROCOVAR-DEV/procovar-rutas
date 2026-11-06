@@ -1532,3 +1532,28 @@ img, svg, video, canvas, table { max-width: 100%; }
 }
 .movements td { padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--pv-trazo-tenue); vertical-align: top; }
 .movements tbody tr:hover td { background: var(--pv-azul-tinte); }
+
+/* «Todos | Sin dueño | Con dueño»: un solo control, con la cuenta de cada parte. */
+.segmentos { display: inline-flex; border: 1px solid var(--pv-trazo); border-radius: var(--pv-radio); overflow: hidden; background: var(--pv-blanco); }
+.segmento {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    height: 34px;
+    padding: 0 0.85rem;
+    border: 0;
+    border-right: 1px solid var(--pv-trazo);
+    background: transparent;
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+.segmento:last-child { border-right: 0; }
+.segmento:hover { background: var(--pv-azul-tinte); }
+.segmento[aria-pressed="true"] { background: var(--pv-azul); color: #FFFFFF; }
+.segmento:focus-visible { outline: 2px solid var(--pv-azul); outline-offset: -2px; }
+.segmento-n { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 12px; opacity: .8; }
+
+/* El buscador del calendario, junto a los demás controles. */
+.controles-buscar { flex: 0 1 240px; margin-left: auto; height: 34px; }

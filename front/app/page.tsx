@@ -194,10 +194,15 @@ export default function Calendar() {
 
   // La sucursal que se eligió arriba: quien ve varias elige una; quien ve una sola no tiene selector.
   const sucursal = useSucursal(porSucursal.map((g) => g.nombre));
-  const visibles = useMemo(
-    () => (sucursal ? porSucursal.filter((g) => g.nombre === sucursal) : porSucursal),
-    [porSucursal, sucursal],
-  );
+  // El buscador: por nombre de vendedor, dentro de la sucursal elegida.
+  const [buscar, setBuscar] = useState("");
+  const visibles = useMemo(() => {
+    const q = buscar.trim().toLowerCase();
+
+    return (sucursal ? porSucursal.filter((g) => g.nombre === sucursal) : porSucursal)
+      .map((g) => ({ ...g, filas: q ? g.filas.filter(([, v]) => v.name.toLowerCase().includes(q)) : g.filas }))
+      .filter((g) => g.filas.length > 0);
+  }, [porSucursal, sucursal, buscar]);
   const agrupar = haceFaltaAgrupar(visibles);
 
   /**
@@ -321,6 +326,14 @@ export default function Calendar() {
             {trayendo ? "Encolando…" : "Traer pedidos"}
           </button>
         )}
+        <input
+          type="search"
+          className="filtros-buscar controles-buscar"
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+          placeholder="Buscar un vendedor"
+          aria-label="Buscar un vendedor"
+        />
         <span className="controles-cuenta">
           {week.length} {week.length === 1 ? "día" : "días"}
           {bySeller.size > 0 ? ` · ${bySeller.size} vendedores` : ""}

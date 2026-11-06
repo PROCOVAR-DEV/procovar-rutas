@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { borrar, enviar } from "@/lib/api";
 import { agruparPorSucursal } from "@/lib/porSucursal";
 import { sugerirPersona } from "@/lib/sugerir";
-import Filtros from "./Filtros";
+import Filtros, { Segmentos } from "./Filtros";
 import type { Carpeta, Persona } from "./tipos";
 
 /**
@@ -35,24 +35,30 @@ export default function ColaGps({
   children?: React.ReactNode;
 }) {
   const [busqueda, setBusqueda] = useState("");
-  const [soloPendientes, setSoloPendientes] = useState(true);
+  const [estado, setEstado] = useState<"todos" | "sin" | "con">("todos");
 
   const grupos = useMemo(
     () => agruparPorSucursal(carpetas, (g) => g.branch, (g) => g.name),
     [carpetas],
   );
+  const delAlcance = sucursal ? carpetas.filter((c) => c.branch === sucursal) : carpetas;
   const q = busqueda.trim().toLowerCase();
+  // Se busca por el nombre del GPS y también por quien lo lleva.
+  const coincide = (c: Carpeta) =>
+    !q || c.name.toLowerCase().includes(q) || c.seller.toLowerCase().includes(q);
+  const delEstado = (c: Carpeta) =>
+    estado === "todos" || (estado === "sin" ? c.sellerId === "" : c.sellerId !== "");
   const visibles = grupos
     .filter((g) => !sucursal || g.nombre === sucursal)
     .map((g) => ({
       ...g,
-      filas: g.filas.filter(
-        (c) => (!soloPendientes || c.sellerId === "") && (!q || c.name.toLowerCase().includes(q)),
-      ),
+      // Lo que falta por asignar, primero; dentro de cada parte, por nombre.
+      filas: g.filas
+        .filter((c) => delEstado(c) && coincide(c))
+        .sort((a, b) => Number(b.sellerId === "") - Number(a.sellerId === "")),
     }))
     .filter((g) => g.filas.length > 0);
 
-  const delAlcance = sucursal ? carpetas.filter((c) => c.branch === sucursal) : carpetas;
   const pendientes = delAlcance.filter((c) => c.sellerId === "").length;
   const total = visibles.reduce((n, g) => n + g.filas.length, 0);
 
@@ -71,21 +77,23 @@ export default function ColaGps({
       <Filtros
         busqueda={busqueda}
         alBuscar={setBusqueda}
-        placeholder="Buscar un GPS por nombre"
+        placeholder="Buscar un GPS o quien lo lleva"
       >
-        <label className="filtros-interruptor">
-          <input
-            type="checkbox"
-            checked={soloPendientes}
-            onChange={(e) => setSoloPendientes(e.target.checked)}
-          />
-          Solo sin dueño
-        </label>
+        <Segmentos
+          etiqueta="Qué GPS mostrar"
+          valor={estado}
+          alElegir={setEstado}
+          opciones={[
+            { clave: "todos", titulo: "Todos", n: delAlcance.length },
+            { clave: "sin", titulo: "Sin dueño", n: pendientes },
+            { clave: "con", titulo: "Con dueño", n: delAlcance.length - pendientes },
+          ]}
+        />
       </Filtros>
 
       {total === 0 ? (
         <p className="cola-vacia">
-          {soloPendientes && pendientes === 0
+          {estado === "sin" && pendientes === 0
             ? "No queda ninguno por asignar."
             : "Ningún GPS coincide con lo que buscas."}
         </p>

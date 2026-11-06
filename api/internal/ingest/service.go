@@ -244,6 +244,10 @@ type claveDia struct {
 // carpetas, así que crear a ciegas duplicaría a la misma persona una vez por
 // fichero.
 func (s *Service) sellerFromFolder(ctx context.Context, source store.DriveSource) (string, error) {
+	if gpx.EsCarpetaReservada(source.Name) {
+		return "", fmt.Errorf("«%s» es una carpeta de servicio, no el GPS de nadie", source.Name)
+	}
+
 	branchID, err := s.branchOfSource(ctx, source)
 	if err != nil {
 		return "", err

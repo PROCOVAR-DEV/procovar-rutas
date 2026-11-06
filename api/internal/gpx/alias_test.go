@@ -129,3 +129,16 @@ func TestCarpetaSinCasarLlevaSuNombreALaBandeja(t *testing.T) {
 		t.Errorf("= %+v", r)
 	}
 }
+
+func TestCarpetasReservadasNoSonPersonas(t *testing.T) {
+	for _, n := range []string{"ERROR", "Errores", "GPS Errores", "Procesados", "GPS Procesados"} {
+		if !EsCarpetaReservada(n) {
+			t.Errorf("%q es una carpeta de servicio", n)
+		}
+	}
+	for _, n := range []string{"GPS Diana Acosta", "ALEXANDER", "Errol"} {
+		if EsCarpetaReservada(n) {
+			t.Errorf("%q es una persona", n)
+		}
+	}
+}

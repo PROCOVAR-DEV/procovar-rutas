@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/procovar/procovar-rutas/api/internal/gpx"
 	"net/http"
 	"time"
 
@@ -166,7 +167,14 @@ func (s *Server) sellers(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "sellers", err)
 		return
 	}
-	respond(w, http.StatusOK, aSellers(lista))
+	// Sin las carpetas de servicio (ERROR, Procesados…): no son nadie y salían en los desplegables.
+	personas := make([]store.Seller, 0, len(lista))
+	for _, t := range lista {
+		if !gpx.EsCarpetaReservada(t.Name) {
+			personas = append(personas, t)
+		}
+	}
+	respond(w, http.StatusOK, aSellers(personas))
 }
 
 // The viewer: a seller's day with its points and its stops.

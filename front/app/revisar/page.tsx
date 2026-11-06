@@ -25,7 +25,7 @@ import { useSesion, useSucursal } from "@/components/Sesion";
 import { agruparPorSucursal } from "@/lib/porSucursal";
 import { sugerirGps } from "@/lib/sugerir";
 import ColaGps from "./ColaGps";
-import Filtros from "./Filtros";
+import Filtros, { Segmentos } from "./Filtros";
 import type { Carpeta, Persona } from "./tipos";
 import { useEvents } from "@/lib/events";
 import { ask, borrar, enviar, type Seller } from "@/lib/api";
@@ -333,7 +333,7 @@ function ColaPedido({
   alEmparejar: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
-  const [soloPendientes, setSoloPendientes] = useState(true);
+  const [estado, setEstado] = useState<"todos" | "sin" | "con">("todos");
 
   const grupos = agruparPorSucursal(vendors, (v) => v.branch, (v) => v.name);
   const q = busqueda.trim().toLowerCase();
@@ -341,11 +341,16 @@ function ColaPedido({
     .filter((g) => !sucursal || g.nombre === sucursal)
     .map((g) => ({
       ...g,
-      filas: g.filas.filter(
-        (v) =>
-          (!soloPendientes || v.sellerId === "") &&
-          (!q || v.name.toLowerCase().includes(q) || v.code.toLowerCase().includes(q)),
-      ),
+      filas: g.filas
+        .filter(
+          (v) =>
+            (estado === "todos" || (estado === "sin" ? v.sellerId === "" : v.sellerId !== "")) &&
+            (!q ||
+              v.name.toLowerCase().includes(q) ||
+              v.code.toLowerCase().includes(q) ||
+              v.seller.toLowerCase().includes(q)),
+        )
+        .sort((a, b) => Number(b.sellerId === "") - Number(a.sellerId === "")),
     }))
     .filter((g) => g.filas.length > 0);
   const delAlcance = sucursal ? vendors.filter((v) => v.branch === sucursal) : vendors;
@@ -362,16 +367,18 @@ function ColaPedido({
       <Filtros
         busqueda={busqueda}
         alBuscar={setBusqueda}
-        placeholder="Buscar por nombre o usuario"
+        placeholder="Buscar por nombre, usuario o GPS"
       >
-        <label className="filtros-interruptor">
-          <input
-            type="checkbox"
-            checked={soloPendientes}
-            onChange={(e) => setSoloPendientes(e.target.checked)}
-          />
-          Solo sin emparejar
-        </label>
+        <Segmentos
+          etiqueta="Qué vendedores mostrar"
+          valor={estado}
+          alElegir={setEstado}
+          opciones={[
+            { clave: "todos", titulo: "Todos", n: delAlcance.length },
+            { clave: "sin", titulo: "Sin emparejar", n: pendientes },
+            { clave: "con", titulo: "Emparejados", n: delAlcance.length - pendientes },
+          ]}
+        />
       </Filtros>
 
       {visibles.length === 0 ? (
