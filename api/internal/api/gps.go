@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/procovar/procovar-rutas/api/internal/events"
 	"github.com/procovar/procovar-rutas/api/internal/gpx"
 	"github.com/procovar/procovar-rutas/api/internal/store"
+	"github.com/procovar/procovar-rutas/api/internal/sucursales"
 )
 
 // Los GPS, que son las carpetas de Drive.
@@ -275,6 +277,14 @@ func (s *Server) assignGps(w http.ResponseWriter, r *http.Request) {
 			s.log.Error("recálculo tras asignar la carpeta", "dia", d, "error", err)
 		}
 	}
+
+	// Con un solo enlace basta: asignado el GPS a su usuario de Accesos, su vendedor de PEDIDO se enlaza
+	// solo (por el código o el nombre), sin esperar a la vuelta de cada hora.
+	go func() {
+		if _, err := sucursales.EmparejarConAccesos(context.Background(), s.q, s.auth); err != nil {
+			s.log.Warn("no se pudo emparejar al vendedor tras asignar el GPS", "error", err)
+		}
+	}()
 
 	s.auth.RecordAudit(r.Context(), "rutas.gps.asignar", fuente.ID, c.AuthUserID)
 	s.notify(r, events.Event{Type: events.TypeFile, Detail: "carpeta asignada"})

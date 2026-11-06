@@ -23,8 +23,9 @@ type Gente interface {
 //
 // Las dos listas son la misma gente: el código de un vendedor de PEDIDO es el usuario de Accesos
 // («georlis.cardenas») y su nombre es el nombre de la persona. Nadie tiene que decirlo a mano: si el
-// código o el nombre completo coinciden con los de UNA persona —y es de la misma sucursal—, se le
-// crea su ficha aquí (si no la tiene) y se enlazan. Lo que ya decidió una persona a mano no se toca, y lo dudoso (dos
+// código o el nombre completo coinciden con los de UNA persona —y es de la misma sucursal— y esa
+// persona ya tiene su ficha (porque se le asignó un GPS), se enlazan. Un enlace viejo «por el nombre»
+// contra una ficha local sin cuenta se pasa también a la persona de Accesos. Lo que ya decidió una persona a mano no se toca, y lo dudoso (dos
 // personas con ese usuario, otra sucursal) se deja sin emparejar para que lo diga alguien.
 func EmparejarConAccesos(ctx context.Context, q *store.Queries, gente Gente) (int, error) {
 	miembros, err := gente.Members(ctx, "", nil)
@@ -61,8 +62,18 @@ func EmparejarConAccesos(ctx context.Context, q *store.Queries, gente Gente) (in
 
 	n := 0
 	for _, v := range vendedores {
-		if v.SellerID != "" || !v.Active || v.Code == nil {
+		if !v.Active || v.Code == nil {
 			continue
+		}
+		if v.SellerID != "" {
+			// Ya enlazado. Solo se revisa si lo hizo el automático contra una ficha local (una carpeta de
+			// Drive sin cuenta de Accesos): ese enlace no es a un usuario de verdad. Lo manual no se toca.
+			if v.Origin == "manual" {
+				continue
+			}
+			if t, err := q.SellerByID(ctx, v.SellerID); err != nil || t.AuthUserID != nil {
+				continue
+			}
 		}
 		codigo := strings.TrimSpace(*v.Code)
 		// Por el código (el usuario) o por el nombre completo; cuenta si sale UNA sola persona.
@@ -86,14 +97,18 @@ func EmparejarConAccesos(ctx context.Context, q *store.Queries, gente Gente) (in
 			continue // sin sucursal enlazada, o la persona es de otra: que lo mire alguien
 		}
 
+		// Solo a quien ya tiene ficha: la tiene cuando se le asigna un GPS, y ahí está su historial. Crear
+		// una ficha vacía aquí separaría sus rutas de su vendedor; mejor esperar a que se le asigne el GPS
+		// (y este mismo proceso lo enlaza entonces).
 		ficha, err := q.SellerByAuthID(ctx, &persona.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			ficha, err = q.CreateSellerFromAuth(ctx, store.CreateSellerFromAuthParams{
-				ID: nuevoID(), Name: persona.Name, BranchID: sucursal, AuthUserID: &persona.ID,
-			})
+			continue
 		}
 		if err != nil {
 			return n, err
+		}
+		if v.SellerID == ficha.ID {
+			continue // ya está bien
 		}
 
 		if err := q.UpsertSellerLink(ctx, store.UpsertSellerLinkParams{

@@ -87,6 +87,19 @@ func TestEmparejarConAccesosPorUsuario(t *testing.T) {
 		{ID: "u1", Name: "Georlis", Email: "georlis.cardenas@procovar.cloud", OrganizationID: "org-cam"},
 		{ID: "u2", Name: "YOAN DOMINGUEZ HIDALGO", Email: "yoan.d@procovar.cloud", OrganizationID: "org-cam"},
 	}
+
+	// Sin ficha (a nadie se le ha asignado un GPS todavía) no se enlaza nada ni se crean fichas vacías.
+	if n, err := EmparejarConAccesos(ctx, q, gente); err != nil || n != 0 {
+		t.Fatalf("sin fichas no debía emparejar nada: %d (%v)", n, err)
+	}
+
+	// Al asignarles un GPS tienen ficha, y entonces se enlazan solos.
+	for _, u := range []string{"u1", "u2"} {
+		id := u
+		if _, err := q.CreateSellerFromAuth(ctx, store.CreateSellerFromAuthParams{ID: "f" + u, Name: u, BranchID: suc.ID, AuthUserID: &id}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	n, err := EmparejarConAccesos(ctx, q, gente)
 	if err != nil || n != 2 {
 		t.Fatalf("debía emparejar 2 (usuario y nombre), emparejó %d (%v)", n, err)
