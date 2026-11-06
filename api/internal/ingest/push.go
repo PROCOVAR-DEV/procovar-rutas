@@ -44,6 +44,9 @@ type Pushed struct {
 	Content    []byte
 }
 
+// ErrCarpetaDeBaja: la carpeta existe pero se dio de baja en Rutas; lo que llegue de ella se ignora.
+var ErrCarpetaDeBaja = errors.New("carpeta dada de baja")
+
 // Receive processes a pushed file.
 //
 // An empty file is recorded rather than refused: a 0-byte .gpx exists in Drive, and
@@ -91,6 +94,11 @@ func (s *Service) Receive(ctx context.Context, e Pushed) (bool, int64, error) {
 	}
 
 	source, err := s.findSource(ctx, e)
+	if errors.Is(err, ErrCarpetaDeBaja) {
+		// Dada de baja en Rutas: no entra nada más de ella, y no es un fallo que reintentar.
+		s.log.Info("empuje de una carpeta dada de baja: se ignora", "carpeta", e.FolderID, "fichero", e.Name)
+		return false, 0, nil
+	}
 	if err != nil {
 		return false, 0, err
 	}
@@ -159,6 +167,12 @@ func (s *Service) findSource(ctx context.Context, e Pushed) (store.DriveSource, 
 		if f.FolderID == e.FolderID {
 			return f, nil
 		}
+	}
+
+	// Si la carpeta existe pero está dada de baja, NO se vuelve a dar de alta: la baja es para que
+	// sus ficheros no entren más (y volver a crearla chocaría con el índice único de todas formas).
+	if baja, err := s.q.SourceByFolderID(ctx, e.FolderID); err == nil && !baja.Active {
+		return store.DriveSource{}, ErrCarpetaDeBaja
 	}
 
 	if e.Account == "" {

@@ -443,3 +443,7 @@ WHERE id = @id;
 -- name: DeactivateSourcesOfSeller :exec
 -- Las carpetas de alguien dado de baja dejan de barrerse.
 UPDATE drive_source SET activa = FALSE, updated_at = now() WHERE trabajador_id = @seller_id;
+
+-- name: SourceByFolderID :one
+-- Por el id de la carpeta de Drive, esté o no dada de baja: sirve para NO volver a darla de alta.
+SELECT * FROM drive_source WHERE folder_id = @folder_id;

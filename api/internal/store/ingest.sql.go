@@ -1606,3 +1606,29 @@ func (q *Queries) DeactivateSourcesOfSeller(ctx context.Context, sellerID *strin
 	_, err := q.db.Exec(ctx, deactivateSourcesOfSeller, sellerID)
 	return err
 }
+
+const sourceByFolderID = `-- name: SourceByFolderID :one
+SELECT id, nombre, folder_id, tipo, sucursal_id, trabajador_id, credencial, activa, cursor_modificado, ultimo_barrido, ultimo_error, created_at, updated_at FROM drive_source WHERE folder_id = $1
+`
+
+// Por el id de la carpeta de Drive, esté o no dada de baja: sirve para NO volver a darla de alta.
+func (q *Queries) SourceByFolderID(ctx context.Context, folderID string) (DriveSource, error) {
+	row := q.db.QueryRow(ctx, sourceByFolderID, folderID)
+	var i DriveSource
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.FolderID,
+		&i.Type,
+		&i.BranchID,
+		&i.SellerID,
+		&i.Credential,
+		&i.Active,
+		&i.ModifiedCursor,
+		&i.LastScan,
+		&i.LastError,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
