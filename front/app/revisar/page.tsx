@@ -236,7 +236,7 @@ export default function Revisar() {
       )}
 
       {actual.clave === "pedido" && (
-        <ColaPedido sucursal={sucursal} vendors={datos.vendors ?? []} vendedores={vendedores} alEmparejar={cargar} />
+        <ColaPedido sucursal={sucursal} vendors={datos.vendors ?? []} personas={personas} alEmparejar={cargar} />
       )}
 
       {actual.clave === "sinsubir" && <ColaSinSubir sucursal={sucursal} callados={callados} />}
@@ -324,12 +324,12 @@ export default function Revisar() {
 function ColaPedido({
   sucursal,
   vendors,
-  vendedores,
+  personas,
   alEmparejar,
 }: {
   sucursal: string;
   vendors: Vendedor[];
-  vendedores: Seller[];
+  personas: Persona[];
   alEmparejar: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -410,7 +410,7 @@ function ColaPedido({
                         </span>
                       </>
                     ) : (
-                      <ElegirVendedor vendedor={v} vendedores={vendedores} alEmparejar={alEmparejar} />
+                      <ElegirVendedor vendedor={v} personas={personas} alEmparejar={alEmparejar} />
                     )}
                   </div>
                 </li>
@@ -543,35 +543,46 @@ function FilaFichero({
 
 function ElegirVendedor({
   vendedor,
-  vendedores,
+  personas,
   alEmparejar,
 }: {
   vendedor: Vendedor;
-  vendedores: Seller[];
+  /** La gente de Accesos: de ahí se elige, no de las fichas sueltas de las carpetas de Drive. */
+  personas: Persona[];
   alEmparejar: () => void;
 }) {
-  const [seller, setVendedor] = useState("");
+  const [quien, setQuien] = useState("");
   const [otro, setOtro] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [fallo, setFallo] = useState<string | null>(null);
 
-  // Solo los GPS de la sucursal de este vendedor; si no se sabe cuál es, todos antes que ninguno.
+  // Solo la gente de la sucursal de este vendedor; si no se sabe cuál es, todos antes que ninguno.
   const lista = useMemo(() => {
-    const suyos = vendedor.branchId ? vendedores.filter((v) => v.branchId === vendedor.branchId) : [];
+    const suyos = vendedor.branchId ? personas.filter((p) => p.branchId === vendedor.branchId) : [];
 
-    return suyos.length > 0 ? suyos : vendedores;
-  }, [vendedores, vendedor.branchId]);
-  const sugerido = useMemo(() => sugerirGps(vendedor, lista), [vendedor, lista]);
+    return suyos.length > 0 ? suyos : personas;
+  }, [personas, vendedor.branchId]);
 
-  async function emparejar(sellerId: string) {
-    if (!sellerId) return;
+  // El código del vendedor de PEDIDO ES el usuario de Accesos (georlis.cardenas): casan por nombre y usuario.
+  const sugerido = useMemo(() => {
+    const candidatas = lista.map((p) => ({ p, name: `${p.name} ${p.email.split("@")[0] ?? ""}` }));
+
+    return sugerirGps(vendedor, candidatas)?.p ?? null;
+  }, [vendedor, lista]);
+
+  async function emparejar(authUserId: string) {
+    if (!authUserId) return;
+    const persona = lista.find((p) => p.authUserId === authUserId);
+
     setGuardando(true);
     setFallo(null);
     try {
       await enviar("/api/pedidos/emparejar", {
         vendorCode: vendedor.code,
         vendorName: vendedor.name,
-        sellerId,
+        authUserId,
+        branchId: vendedor.branchId,
+        name: persona?.name ?? "",
       });
       alEmparejar();
     } catch (e) {
@@ -590,7 +601,7 @@ function ElegirVendedor({
         <button
           className="pv-boton pv-boton-primario pv-boton-corto"
           disabled={guardando}
-          onClick={() => emparejar(sugerido.id)}
+          onClick={() => emparejar(sugerido.authUserId)}
         >
           {guardando ? "…" : "Sí, es este"}
         </button>
@@ -602,24 +613,29 @@ function ElegirVendedor({
     );
   }
 
+  if (lista.length === 0) {
+    return <span className="sub">no hay gente de esta sucursal en Accesos</span>;
+  }
+
   return (
     <>
       <select
-        value={seller}
-        onChange={(e) => setVendedor(e.target.value)}
-        aria-label={`¿Quién es ${vendedor.name} aquí?`}
+        value={quien}
+        onChange={(e) => setQuien(e.target.value)}
+        aria-label={`¿Quién es ${vendedor.name} en Accesos?`}
       >
-        <option value="">¿Quién es aquí?</option>
-        {lista.map((v) => (
-          <option key={v.id} value={v.id}>
-            {v.name}
+        <option value="">¿Quién es en Accesos?</option>
+        {lista.map((p) => (
+          <option key={p.authUserId} value={p.authUserId}>
+            {p.name || p.email}
+            {p.roles.length > 0 ? ` · ${p.roles.join(", ").toLowerCase()}` : ""}
           </option>
         ))}
       </select>
       <button
         className="pv-boton pv-boton-primario pv-boton-corto"
-        disabled={!seller || guardando}
-        onClick={() => emparejar(seller)}
+        disabled={!quien || guardando}
+        onClick={() => emparejar(quien)}
       >
         {guardando ? "…" : "Es este"}
       </button>

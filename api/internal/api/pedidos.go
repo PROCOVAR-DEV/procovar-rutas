@@ -131,6 +131,11 @@ type peticionEmparejar struct {
 	VendorCode string `json:"vendorCode"`
 	VendorName string `json:"vendorName"`
 	SellerID   string `json:"sellerId"`
+	// Lo normal: la persona de ACCESOS. Si todavía no tiene ficha aquí se crea, en la sucursal del
+	// vendedor; el desplegable ofrece solo a la gente de Accesos, no las fichas sueltas de carpetas.
+	AuthUserID string `json:"authUserId"`
+	BranchID   string `json:"branchId"`
+	Name       string `json:"name"`
 }
 
 // POST /api/pedidos/emparejar — decir a mano quién es quién.
@@ -144,12 +149,40 @@ func (s *Server) emparejar(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "cuerpo ilegible")
 		return
 	}
-	if pet.VendorCode == "" || pet.SellerID == "" {
-		respondError(w, http.StatusBadRequest, "falta el vendedor o el trabajador")
+	if pet.VendorCode == "" || (pet.SellerID == "" && pet.AuthUserID == "") {
+		respondError(w, http.StatusBadRequest, "falta el vendedor o la persona")
 		return
 	}
 
 	c := FromContext(r)
+
+	// Una persona de Accesos: se usa su ficha, o se crea en la sucursal del vendedor.
+	if pet.SellerID == "" {
+		if t, err := s.q.SellerByAuthID(r.Context(), &pet.AuthUserID); err == nil {
+			pet.SellerID = t.ID
+		} else {
+			if pet.BranchID == "" {
+				respondError(w, http.StatusBadRequest, "ese vendedor no tiene sucursal: no se sabe dónde crear la ficha")
+				return
+			}
+			if c.Role != "super_admin" && c.BranchID != "" && c.BranchID != pet.BranchID {
+				respondError(w, http.StatusForbidden, "sin acceso a esa sucursal")
+				return
+			}
+			nombre := pet.Name
+			if nombre == "" {
+				nombre = pet.VendorName
+			}
+			t, err := s.q.CreateSellerFromAuth(r.Context(), store.CreateSellerFromAuthParams{
+				ID: newID(), Name: nombre, BranchID: pet.BranchID, AuthUserID: &pet.AuthUserID,
+			})
+			if err != nil {
+				s.fail(w, "creando la ficha", err)
+				return
+			}
+			pet.SellerID = t.ID
+		}
+	}
 	filtro, err := c.Scope(time.Now())
 	if err != nil {
 		respondError(w, http.StatusForbidden, err.Error())
