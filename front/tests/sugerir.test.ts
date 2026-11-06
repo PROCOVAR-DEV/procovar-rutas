@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sugerirPersona } from "../lib/sugerir";
+import { sugerirGps, sugerirPersona } from "../lib/sugerir";
 
 const gente = [
   { authUserId: "1", name: "Niurbelis Sánchez", email: "niurbelis.sanchez@procovar.cloud" },
@@ -27,4 +27,13 @@ test("sin nombre propio (solo ruido) o sin coincidencia, nada", () => {
 
 test("las tildes y las mayúsculas no importan", () => {
   assert.equal(sugerirPersona("NIURBELIS SANCHEZ", gente)?.authUserId, "1");
+});
+
+test("de un vendedor de PEDIDO al GPS que lleva su nombre", () => {
+  const gps = [{ name: "GEORLI" }, { name: "ALEXANDER" }, { name: "TABLET3" }, { name: "GPS Oreste" }, { name: "GPS Oreste" }];
+
+  assert.equal(sugerirGps({ name: "GEORLIS MICHEL CARDENAS MORA", code: "georlis.cardenas" }, gps)?.name, "GEORLI");
+  // Dos GPS con el mismo nombre: no se adivina.
+  assert.equal(sugerirGps({ name: "ORESTE VALDEZ ROSABAL", code: "oreste.valdez" }, gps), null);
+  assert.equal(sugerirGps({ name: "VENTA ALMACEN", code: "venta.almacen" }, gps), null);
 });

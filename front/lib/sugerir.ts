@@ -43,3 +43,24 @@ export function sugerirPersona<T extends PersonaSugerible>(carpeta: string, pers
 
   return candidatas.length === 1 ? candidatas[0] : null;
 }
+
+/**
+ * Lo mismo al revés: ¿cuál de los GPS de esta sucursal es este vendedor de PEDIDO?
+ *
+ * El vendedor es «GEORLIS MICHEL CARDENAS MORA» (usuario `georlis.cardenas`) y el GPS se llama
+ * «GEORLI»: cada palabra del nombre del GPS tiene que ser el principio de una del vendedor.
+ * Solo se sugiere si sale uno solo.
+ */
+export function sugerirGps<S extends { name: string }>(
+  vendedor: { name: string; code: string },
+  gps: S[],
+): S | null {
+  const suyas = [...palabras(vendedor.name), ...palabras(vendedor.code.split("@")[0] ?? "")];
+  const candidatos = gps.filter((g) => {
+    const nombre = palabras(g.name);
+
+    return nombre.length > 0 && nombre.every((x) => suyas.some((y) => y.startsWith(x) || x.startsWith(y)));
+  });
+
+  return candidatos.length === 1 ? candidatos[0] : null;
+}

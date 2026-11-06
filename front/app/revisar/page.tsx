@@ -19,10 +19,11 @@
  * El calendario se queda con una línea que dice cuántas cosas hay y trae aquí.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import SinPermiso from "@/components/SinPermiso";
 import { useSesion, useSucursal } from "@/components/Sesion";
 import { agruparPorSucursal } from "@/lib/porSucursal";
+import { sugerirGps } from "@/lib/sugerir";
 import ColaGps from "./ColaGps";
 import Filtros from "./Filtros";
 import type { Carpeta, Persona } from "./tipos";
@@ -54,6 +55,7 @@ interface VendedorCallado {
 
 /** Un vendedor de PEDIDO y quién es aquí, si ya se dijo. */
 interface Vendedor {
+  branchId: string;
   ref: string;
   code: string;
   name: string;
@@ -542,18 +544,27 @@ function ElegirVendedor({
   alEmparejar: () => void;
 }) {
   const [seller, setVendedor] = useState("");
+  const [otro, setOtro] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [fallo, setFallo] = useState<string | null>(null);
 
-  async function emparejar() {
-    if (!seller) return;
+  // Solo los GPS de la sucursal de este vendedor; si no se sabe cuál es, todos antes que ninguno.
+  const lista = useMemo(() => {
+    const suyos = vendedor.branchId ? vendedores.filter((v) => v.branchId === vendedor.branchId) : [];
+
+    return suyos.length > 0 ? suyos : vendedores;
+  }, [vendedores, vendedor.branchId]);
+  const sugerido = useMemo(() => sugerirGps(vendedor, lista), [vendedor, lista]);
+
+  async function emparejar(sellerId: string) {
+    if (!sellerId) return;
     setGuardando(true);
     setFallo(null);
     try {
       await enviar("/api/pedidos/emparejar", {
         vendorCode: vendedor.code,
         vendorName: vendedor.name,
-        sellerId: seller,
+        sellerId,
       });
       alEmparejar();
     } catch (e) {
@@ -563,28 +574,57 @@ function ElegirVendedor({
     }
   }
 
+  if (sugerido && !otro) {
+    return (
+      <>
+        <span className="gps-sugerencia">
+          ¿Es <b>{sugerido.name}</b>?
+        </span>
+        <button
+          className="pv-boton pv-boton-primario pv-boton-corto"
+          disabled={guardando}
+          onClick={() => emparejar(sugerido.id)}
+        >
+          {guardando ? "…" : "Sí, es este"}
+        </button>
+        <button className="pv-boton-texto" onClick={() => setOtro(true)}>
+          Otro
+        </button>
+        {fallo && <span className="gps-error">{fallo}</span>}
+      </>
+    );
+  }
+
   return (
-    <div className="elegir">
-      <select value={seller} onChange={(e) => setVendedor(e.target.value)}>
+    <>
+      <select
+        value={seller}
+        onChange={(e) => setVendedor(e.target.value)}
+        aria-label={`¿Quién es ${vendedor.name} aquí?`}
+      >
         <option value="">¿Quién es aquí?</option>
-        {vendedores.map((v) => (
+        {lista.map((v) => (
           <option key={v.id} value={v.id}>
             {v.name}
           </option>
         ))}
       </select>
       <button
-        className="pv-boton pv-boton-primario"
+        className="pv-boton pv-boton-primario pv-boton-corto"
         disabled={!seller || guardando}
-        onClick={emparejar}
+        onClick={() => emparejar(seller)}
       >
         {guardando ? "…" : "Es este"}
       </button>
-      {fallo && <span className="aviso">{fallo}</span>}
-    </div>
+      {otro && (
+        <button className="pv-boton-texto" onClick={() => setOtro(false)}>
+          Cancelar
+        </button>
+      )}
+      {fallo && <span className="gps-error">{fallo}</span>}
+    </>
   );
 }
-
 
 function FilaRota({
   fichero,

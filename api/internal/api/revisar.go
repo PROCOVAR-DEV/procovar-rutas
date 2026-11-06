@@ -237,7 +237,9 @@ type Vendor struct {
 	Code   string `json:"code"`
 	Name   string `json:"name"`
 	Branch string `json:"branch"`
-	Orders int32  `json:"orders"`
+	// BranchID: para ofrecerle solo los GPS de su sucursal al emparejar.
+	BranchID string `json:"branchId"`
+	Orders   int32  `json:"orders"`
 	// SellerID vacío = todavía no se sabe quién es aquí, y sus pedidos no se cruzan
 	// con ninguna ruta mientras siga así.
 	SellerID string `json:"sellerId"`
@@ -254,7 +256,12 @@ func aVendors(vs []store.VendorsWithLinkRow) []Vendor {
 		if v.Code != nil && *v.Code != "" {
 			codigo = *v.Code
 		}
+		sucursal := ""
+		if v.BranchID != nil {
+			sucursal = *v.BranchID
+		}
 		out = append(out, Vendor{
+			BranchID: sucursal,
 			Ref:      v.Ref,
 			Code:     codigo,
 			Name:     v.Name,
