@@ -32,7 +32,7 @@ import { Icon } from "@iconify/react";
 import { flechaIzquierda, flechaDerecha, traer, aviso as iconoAviso, ir } from "@/components/iconos";
 import RangoFechas from "@/components/RangoFechas";
 import SinPermiso from "@/components/SinPermiso";
-import { useSesion } from "@/components/Sesion";
+import { useSesion, useSucursal } from "@/components/Sesion";
 import { useEvents } from "@/lib/events";
 import { agruparPorSucursal, haceFaltaAgrupar, leerPlegadas, guardarPlegadas } from "@/lib/porSucursal";
 import {
@@ -192,7 +192,13 @@ export default function Calendar() {
     [bySeller],
   );
 
-  const agrupar = haceFaltaAgrupar(porSucursal);
+  // La sucursal que se eligió arriba: quien ve varias elige una; quien ve una sola no tiene selector.
+  const sucursal = useSucursal(porSucursal.map((g) => g.nombre));
+  const visibles = useMemo(
+    () => (sucursal ? porSucursal.filter((g) => g.nombre === sucursal) : porSucursal),
+    [porSucursal, sucursal],
+  );
+  const agrupar = haceFaltaAgrupar(visibles);
 
   /**
    * Qué sucursales están cerradas.
@@ -391,7 +397,7 @@ export default function Calendar() {
               </tr>
             </thead>
             <tbody>
-              {porSucursal.flatMap((grupo) => {
+              {visibles.flatMap((grupo) => {
                 /**
                  * Cuántos de esa sucursal llevan días callados.
                  *
@@ -510,7 +516,7 @@ export default function Calendar() {
           </table>
 
           <div className="fichas-dias solo-estrecho">
-            {porSucursal.flatMap((grupo) => {
+            {visibles.flatMap((grupo) => {
               const cerrada = plegadas.has(grupo.nombre);
               const cabecera = agrupar ? [(
               <button

@@ -1311,3 +1311,224 @@ img, svg, video, canvas, table { max-width: 100%; }
 .pv-boton-texto:hover:not(:disabled) { background: var(--pv-cuno-tinte); color: var(--pv-cuno); }
 .pv-boton-texto:focus-visible { outline: 2px solid var(--pv-cuno); outline-offset: 1px; }
 .pv-boton-texto:disabled { opacity: .55; cursor: default; }
+
+/* El selector de sucursal de la barra: se ve en todas las pantallas y filtra lo que hay debajo. */
+.barra-sucursal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-left: auto;
+    color: #FFFFFF;
+}
+.barra-sucursal-rotulo {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: .7;
+}
+.barra-sucursal select {
+    height: 32px;
+    min-width: 170px;
+    padding: 0 28px 0 10px;
+    border: 1px solid rgba(255, 255, 255, .28);
+    border-radius: var(--pv-radio);
+    background: rgba(255, 255, 255, .08);
+    color: #FFFFFF;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.barra-sucursal select:hover { background: rgba(255, 255, 255, .14); }
+.barra-sucursal select:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+.barra-sucursal select option { background: var(--pv-azul-hondo); color: #FFFFFF; }
+@media (max-width: 720px) {
+    .barra-sucursal-rotulo { display: none; }
+    .barra-sucursal select { min-width: 120px; }
+}
+.barra-sucursal + .sesion { margin-left: 1rem; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REVISAR — la bandeja de trabajo
+   Una cola cada vez. Cada pestaña lleva su cuenta en grande: es lo que se mira primero («cuántos
+   quedan»), y la que tiene trabajo se distingue sin leer. Las filas son de dos líneas, el dato a
+   la izquierda y lo que se hace a la derecha, para que asignar sea un clic y no leer una tabla.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.bandeja-cabecera { margin-bottom: 1rem; }
+.bandeja-cabecera h1 { margin-bottom: 0.15rem; }
+.bandeja-cabecera .sub { margin: 0; }
+
+/* Aviso de que algo se está poniendo al día: una línea, no una tarjeta. */
+.banda {
+    margin: 0 0 1rem;
+    padding: 0.55rem 0.9rem;
+    border-left: 3px solid var(--pv-azul);
+    background: var(--pv-azul-tinte);
+    color: var(--pv-azul-hondo);
+    font-size: 13px;
+}
+.dark .banda { color: var(--pv-tinta); }
+
+.colas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+}
+
+.cola-pestana {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 1rem 0.55rem 0.7rem;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio-grande);
+    background: var(--pv-blanco);
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color .12s, background-color .12s;
+}
+.cola-pestana:hover { border-color: var(--pv-azul); }
+.cola-pestana[aria-selected="true"] {
+    border-color: var(--pv-azul);
+    background: var(--pv-azul);
+    color: #FFFFFF;
+}
+.cola-pestana:focus-visible { outline: 2px solid var(--pv-azul); outline-offset: 2px; }
+
+.cola-pestana-n {
+    min-width: 2.3ch;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--pv-trazo-tenue);
+    color: var(--pv-tinta-suave);
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+}
+.cola-pestana[data-pendiente="true"] .cola-pestana-n { background: var(--pv-cuno-tinte); color: var(--pv-cuno); }
+.cola-pestana[aria-selected="true"] .cola-pestana-n { background: rgba(255, 255, 255, .2); color: #FFFFFF; }
+
+.cola { max-width: 1040px; }
+
+.cola-resumen { margin: 0 0 0.9rem; color: var(--pv-tinta-suave); font-size: 14px; }
+.cola-vacia {
+    margin: 1.5rem 0;
+    padding: 1.4rem 1rem;
+    border: 1px dashed var(--pv-trazo);
+    border-radius: var(--pv-radio-grande);
+    color: var(--pv-tinta-suave);
+    text-align: center;
+}
+
+/* Buscar y el interruptor de «solo pendientes». */
+.filtros { margin-bottom: 0.9rem; }
+.filtros-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; }
+.filtros-buscar {
+    flex: 1 1 260px;
+    max-width: 380px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio);
+    background: var(--pv-blanco);
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13.5px;
+}
+.filtros-buscar:focus-visible { outline: 2px solid var(--pv-azul); outline-offset: -1px; }
+.filtros-interruptor { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 13px; cursor: pointer; }
+.filtros-interruptor input { width: 16px; height: 16px; accent-color: var(--pv-azul); cursor: pointer; }
+
+.cola-grupo { margin-bottom: 1.25rem; }
+.cola-grupo-titulo {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    margin: 0 0 0.4rem;
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--pv-tinta-suave);
+}
+.cola-grupo-n { font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+/* La lista: filas de dos líneas, con una regla a la izquierda cuando falta algo por hacer. */
+.lista { margin: 0; padding: 0; list-style: none; border: 1px solid var(--pv-trazo-tenue); border-radius: var(--pv-radio-grande); background: var(--pv-blanco); overflow: hidden; }
+.gps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+    padding: 0.7rem 1rem 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--pv-trazo-tenue);
+    border-left: 3px solid transparent;
+}
+.gps:last-child { border-bottom: 0; }
+.gps:hover { background: var(--pv-azul-tinte); }
+.gps[data-sin-dueno="true"] { border-left-color: var(--pv-ambar); }
+
+.gps-datos { display: flex; flex-direction: column; gap: 1px; flex: 1 1 260px; min-width: 0; }
+.gps-nombre { font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+.gps-meta { color: var(--pv-tinta-suave); font-size: 12.5px; }
+.gps-callado {
+    margin-left: 0.5rem;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--pv-cuno-tinte);
+    color: var(--pv-cuno);
+    font-size: 12px;
+    font-weight: 500;
+}
+.gps-error { color: var(--pv-cuno); font-size: 12.5px; }
+
+.gps-dueno { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; flex: 0 1 auto; }
+.gps-persona { font-weight: 600; }
+.gps-sugerencia { font-size: 13.5px; }
+.gps-hecho { color: var(--pv-visto); font-size: 13px; font-weight: 500; }
+.gps-quitar { margin-left: auto; }
+.gps .elegir { flex-wrap: nowrap; }
+
+.pv-boton-corto { height: 32px; padding-top: 0; padding-bottom: 0; }
+.gps-dueno select {
+    min-width: 230px;
+    max-width: 100%;
+    height: 32px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio);
+    background: var(--pv-blanco);
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13px;
+}
+.gps-dueno select:focus-visible { outline: 2px solid var(--pv-azul); outline-offset: -1px; }
+
+/* Los bloques de la cola de ficheros. */
+.cola-bloque { margin-bottom: 1.6rem; }
+.cola-bloque-titulo { margin: 0 0 0.2rem; font-family: var(--font-archivo), system-ui, sans-serif; font-size: 1.05rem; }
+.cola-bloque > .sub { margin: 0 0 0.7rem; max-width: 70ch; }
+
+/* Las tablas que quedan, con cuerpo: encabezado discreto y filas con aire. */
+.movements { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.movements th {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--pv-trazo);
+    text-align: left;
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--pv-tinta-suave);
+}
+.movements td { padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--pv-trazo-tenue); vertical-align: top; }
+.movements tbody tr:hover td { background: var(--pv-azul-tinte); }

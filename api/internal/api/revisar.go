@@ -68,7 +68,13 @@ func (s *Server) review(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, "vendedores", err)
 		return
 	}
-	salida["silent"] = aSilentSellers(estados, nombres)
+	nombresSucursal := map[string]string{}
+	if bs, err := s.q.ActiveBranches(r.Context()); err == nil {
+		for _, b := range bs {
+			nombresSucursal[b.ID] = b.Name
+		}
+	}
+	salida["silent"] = aSilentSellers(estados, nombres, nombresSucursal)
 
 	// 2b. Y los días que entraron A MEDIAS. Es lo que pidió quien usa esto: que no se
 	//     pueda leer «8 km» de medio día como si fueran los de la jornada. El fichero
@@ -159,6 +165,8 @@ type SilentSeller struct {
 	SellerID string `json:"sellerId"`
 	Seller   string `json:"seller"`
 	Branch   string `json:"branchId"`
+	// BranchName: el nombre de la sucursal, para que la pantalla filtre por la que se eligió arriba.
+	BranchName string `json:"branchName"`
 	// LastUpload nulo = por ahí no ha entrado nunca ninguna ruta.
 	LastUpload *string `json:"lastUpload"`
 	DaysSilent int     `json:"daysSilent"`
@@ -166,7 +174,7 @@ type SilentSeller struct {
 	Linked     bool    `json:"linked"`
 }
 
-func aSilentSellers(estados []store.UploadState, trabajadores []store.Seller) []SilentSeller {
+func aSilentSellers(estados []store.UploadState, trabajadores []store.Seller, sucursales map[string]string) []SilentSeller {
 	nombre := make(map[string]store.Seller, len(trabajadores))
 	for _, t := range trabajadores {
 		nombre[t.ID] = t
@@ -183,6 +191,7 @@ func aSilentSellers(estados []store.UploadState, trabajadores []store.Seller) []
 			SellerID:   e.SellerID,
 			Seller:     t.Name,
 			Branch:     t.BranchID,
+			BranchName: sucursales[t.BranchID],
 			DaysSilent: -1,
 			StuckFiles: e.StuckFiles,
 			Linked:     e.Linked,

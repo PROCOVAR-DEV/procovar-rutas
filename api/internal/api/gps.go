@@ -46,6 +46,9 @@ type Persona struct {
 	// SellerID: si esta persona ya tiene ficha aquí, cuál. Sirve para saber quién
 	// está ya enganchado sin tener que cruzar dos listas en la pantalla.
 	SellerID string `json:"sellerId"`
+	// BranchID: la sucursal de Rutas a la que pertenece (por su enlace con Accesos), para
+	// que la pantalla ofrezca a cada GPS solo la gente de su sucursal.
+	BranchID string `json:"branchId"`
 }
 
 // GET /api/personas — la gente de Accesos que puede llevar un GPS.
@@ -85,9 +88,20 @@ func (s *Server) personas(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// De la organización de Accesos a la sucursal de Rutas.
+	sucursalDeOrg := map[string]string{}
+	if bs, err := s.q.ActiveBranches(r.Context()); err == nil {
+		for _, b := range bs {
+			if b.AuthOrgID != nil {
+				sucursalDeOrg[*b.AuthOrgID] = b.ID
+			}
+		}
+	}
+
 	out := make([]Persona, 0, len(gente))
 	for _, m := range gente {
 		p := Persona{
+			BranchID:   sucursalDeOrg[m.OrganizationID],
 			AuthUserID: m.ID,
 			Name:       m.Name,
 			Email:      m.Email,
@@ -111,6 +125,7 @@ type Gps struct {
 	FolderID string `json:"folderId"`
 	Type     string `json:"type"`
 	Branch   string `json:"branch"`
+	BranchID string `json:"branchId"`
 	// SellerID vacío = todavía no se ha dicho de quién es este teléfono.
 	SellerID string `json:"sellerId"`
 	Seller   string `json:"seller"`
@@ -153,6 +168,9 @@ func (s *Server) listGps(w http.ResponseWriter, r *http.Request) {
 		}
 		if f.SellerID != nil {
 			g.SellerID = *f.SellerID
+		}
+		if f.BranchID != nil {
+			g.BranchID = *f.BranchID
 		}
 		if f.LastError != nil {
 			g.LastError = *f.LastError

@@ -21,8 +21,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import SinPermiso from "@/components/SinPermiso";
-import { useSesion } from "@/components/Sesion";
-import { agruparPorSucursal, guardarPlegadas, haceFaltaAgrupar, leerPlegadas } from "@/lib/porSucursal";
+import { useSesion, useSucursal } from "@/components/Sesion";
+import { agruparPorSucursal } from "@/lib/porSucursal";
+import ColaGps from "./ColaGps";
+import Filtros from "./Filtros";
+import type { Carpeta, Persona } from "./tipos";
 import { useEvents } from "@/lib/events";
 import { ask, borrar, enviar, type Seller } from "@/lib/api";
 
@@ -41,6 +44,7 @@ interface FicheroAtascado {
 
 interface VendedorCallado {
   sellerId: string;
+  branchName: string;
   seller: string;
   lastUpload: string | null;
   daysSilent: number;
@@ -62,31 +66,6 @@ interface Vendedor {
 }
 
 /** Alguien de Accesos: una cuenta de verdad, con su rol. */
-interface Persona {
-  authUserId: string;
-  name: string;
-  email: string;
-  branch: string;
-  roles: string[];
-  /** Si ya tiene ficha aquí. */
-  sellerId: string;
-}
-
-/** Una carpeta de Drive, que es un teléfono. */
-interface Carpeta {
-  id: string;
-  name: string;
-  folderId: string;
-  type: string;
-  branch: string;
-  sellerId: string;
-  seller: string;
-  files: number;
-  lastFile: string;
-  daysSilent: number;
-  lastError: string;
-}
-
 interface DiaCortado {
   sellerId: string;
   seller: string;
@@ -132,22 +111,8 @@ export default function Revisar() {
   const [sinCarpetas, setSinCarpetas] = useState<string | null>(null);
   const [sinAccesos, setSinAccesos] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Qué sucursales están ABIERTAS. Aquí, al revés que en el calendario, nace todo cerrado:
-  // son listas de cien filas y ver «todo de golpe» es justo lo que no sirve. Se recuerda
-  // en el navegador lo que cada quien abre.
-  const [abiertas, setAbiertas] = useState<Set<string>>(new Set());
-
-  useEffect(() => setAbiertas(leerPlegadas("revisar-abiertas")), []);
-
-  const alternar = (clave: string) =>
-    setAbiertas((antes) => {
-      const ahora = new Set(antes);
-
-      if (ahora.has(clave)) ahora.delete(clave);
-      else ahora.add(clave);
-      guardarPlegadas("revisar-abiertas", ahora);
-      return ahora;
-    });
+  // Qué cola se está mirando; hasta que se elige una, la primera que tenga trabajo.
+  const [cola, setCola] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
     ask<Revision>("/api/review")
@@ -172,6 +137,16 @@ export default function Revisar() {
 
   useEffect(cargar, [cargar]);
 
+  // Las sucursales que tiene a la vista esta pantalla, para el selector de la barra.
+  const nombresSucursal = Array.from(
+    new Set([
+      ...carpetas.map((c) => c.branch),
+      ...(datos?.vendors ?? []).map((v) => v.branch),
+      ...(datos?.silent ?? []).map((c) => c.branchName),
+    ].filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+  const sucursal = useSucursal(nombresSucursal);
+
   // En vivo: el trabajador va trayendo días y la ingesta va colocando ficheros
   // mientras esta pantalla está abierta. Sin esto habría que recargar para saber si
   // algo avanzó, que es justo la pregunta que se viene a hacer aquí.
@@ -189,377 +164,300 @@ export default function Revisar() {
   const sinDuenno = (datos.vendors ?? []).filter((v) => v.sellerId === "");
   const sinDueno = carpetas.filter((g) => g.sellerId === "");
 
-  /**
-   * Las dos tablas de emparejar, SEPARADAS POR SUCURSAL.
-   *
-   * Salían planas con la sucursal en una columna. Emparejar es un trabajo que se hace por
-   * sucursal —«voy a colocar los GPS de Camagüey»— y en una lista de ochenta y dos filas
-   * ordenadas por otra cosa hay que ir saltando de una a otra leyendo esa columna.
-   */
-  const carpetasPorSucursal = agruparPorSucursal(carpetas, (g) => g.branch, (g) => g.name);
-  const vendedoresPorSucursal = agruparPorSucursal(datos.vendors ?? [], (v) => v.branch, (v) => v.name);
-  const agruparCarpetas = haceFaltaAgrupar(carpetasPorSucursal);
-  const agruparVendedores = haceFaltaAgrupar(vendedoresPorSucursal);
   const callados = datos.silent
     .filter((s) => s.daysSilent === -1 || s.daysSilent > 3)
     .sort((a, b) => (b.daysSilent < 0 ? 1e9 : b.daysSilent) - (a.daysSilent < 0 ? 1e9 : a.daysSilent));
+  // Las cuentas de las pestañas son las de la sucursal elegida arriba.
+  const deLaElegida = (x: { branch: string }) => !sucursal || x.branch === sucursal;
+  const truncados = datos.truncated ?? [];
+  const nFicheros = rotos.length + colocables.length + truncados.length;
+
+  const colas = [
+    ...(puede("rutas.alias")
+      ? [{ clave: "gps", titulo: "GPS sin dueño", n: sinDueno.filter(deLaElegida).length }]
+      : []),
+    ...(puede("rutas.alias") && (datos.vendors?.length ?? 0) > 0
+      ? [{ clave: "pedido", titulo: "Vendedores sin emparejar", n: sinDuenno.filter(deLaElegida).length }]
+      : []),
+    { clave: "sinsubir", titulo: "Sin subir", n: callados.filter((c) => !sucursal || c.branchName === sucursal).length },
+    { clave: "ficheros", titulo: "Ficheros con problema", n: nFicheros },
+  ];
+  const actual = colas.find((c) => c.clave === cola) ?? colas.find((c) => c.n > 0) ?? colas[0];
 
   return (
     <>
-      <h1>Qué hay que revisar</h1>
-      <p className="sub">
-        Lo que impide que el calendario esté completo, con el detalle para poder
-        arreglarlo.
-      </p>
+      <header className="bandeja-cabecera">
+        <h1>Revisar</h1>
+        <p className="sub">Lo que impide que el calendario esté completo. Una cola cada vez.</p>
+      </header>
 
-      {/* Cómo va el trabajador de pedidos. Va primero porque explica por qué una
-          pantalla puede estar a medio llenar: no está rota, se está poniendo al día. */}
+      {/* Cómo va el trabajador de pedidos: explica por qué una pantalla puede estar a medio
+          llenar. No está rota, se está poniendo al día. */}
       {(datos.daysMissing ?? 0) > 0 && (
-        <div className="tarjeta">
-          <b>Trayendo los clientes del histórico</b>
-          <p className="sub">
-            Quedan <b>{datos.daysMissing}</b> días de los que ya hay ruta y todavía no
-            se han pedido sus clientes a PEDIDO. Se traen de treinta en treinta y con
-            una pausa entre uno y otro para no cargar a PEDIDO, así que va lento a
-            propósito: son días que ya pasaron.
-            {datos.queue
-              ? ` Ahora mismo hay ${datos.queue.pendientes} esperando en la cola.`
-              : ""}
-          </p>
-        </div>
-      )}
-
-      {/* Los días que entraron a medias. Van arriba porque son los que ENGAÑAN: el
-          calendario los pinta en verde y con sus kilómetros, y no hay forma de saber
-          desde ahí que son los de medio día. Los otros avisos se ven solos; este no. */}
-      {(datos.truncated?.length ?? 0) > 0 && (
-        <div className="tarjeta">
-          <b>
-            {datos.truncated!.length === 1
-              ? "Un día entró a medias"
-              : `${datos.truncated!.length} días entraron a medias`}
-          </b>
-          <p className="sub">
-            Su fichero se cortó —el teléfono se quedó sin batería, lo mataron a media
-            escritura o la subida a Drive se interrumpió— y lo que hay es el trozo que
-            se pudo leer. <b>Los kilómetros de esos días NO son los de la jornada</b>,
-            así que no sirven para juzgar a nadie. Si hace falta el día completo, hay
-            que volver a subir ese .gpx.
-          </p>
-          <div className="tabla-ancha">
-            <table className="movements">
-              <thead>
-                <tr>
-                  <th>Día</th>
-                  <th>Vendedor</th>
-                  <th>Fichero</th>
-                  <th>Puntos que entraron</th>
-                  <th>Qué pasó</th>
-                </tr>
-              </thead>
-              <tbody>
-                {datos.truncated!.map((d) => (
-                  <tr key={`${d.sellerId}:${d.date}`}>
-                    <td className="pv-codigo">{d.date}</td>
-                    <td>{d.seller}</td>
-                    <td className="pv-codigo">{d.file}</td>
-                    <td>{d.points}</td>
-                    <td className="sub">{d.detail}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Los rotos, primero: son los que solo se arreglan volviendo a subir. */}
-      {rotos.length > 0 && (
-        <div className="tarjeta">
-          <b>
-            {rotos.length === 1
-              ? "Un fichero llegó roto"
-              : `${rotos.length} ficheros llegaron rotos`}
-          </b>
-          <p className="sub">
-            Llegaron a Drive, pero el .gpx no se pudo leer. Estos fallaron con el
-            lector viejo, que era todo o nada; el de ahora rescata lo que traiga un
-            fichero cortado hasta donde llegue. <b>Volver a intentarlo</b> olvida el
-            fichero para que n8n lo traiga otra vez y se lea con el lector de hoy —
-            no borra nada de Drive. Si vuelve a fallar, es que está roto de verdad y
-            hay que subirlo otra vez desde el teléfono.
-          </p>
-          {rotos.map((f) => (
-            <FilaRota key={f.id} fichero={f} alReintentar={cargar} puede={puede("rutas.bandeja")} />
-          ))}
-        </div>
-      )}
-
-      {/* Y los que sí se pueden colocar desde aquí. */}
-      {colocables.length > 0 && (
-        <div className="tarjeta">
-          <b>
-            {colocables.length === 1
-              ? "Un fichero llegó y no se pudo colocar"
-              : `${colocables.length} ficheros llegaron y no se pudieron colocar`}
-          </b>
-          <p className="sub">
-            Al asignarlos se recuerda el dispositivo, y los siguientes de ese mismo
-            teléfono se colocan solos. Es una vez por dispositivo, no todos los días.
-          </p>
-          {colocables.map((f) => (
-            <FilaFichero key={f.id} fichero={f} vendedores={vendedores} alAsignar={cargar} />
-          ))}
-        </div>
-      )}
-
-      {/* Quién no está subiendo, CON FECHA. */}
-      <div className="tarjeta">
-        <b>
-          {callados.length === 0
-            ? "Todos están subiendo"
-            : callados.length === 1
-              ? "Un vendedor lleva días sin subir"
-              : `${callados.length} vendedores llevan días sin subir`}
-        </b>
-        <p className="sub">
-          O no llevan el GPS encendido, o dejó de subir. Más de 3 días callado es un
-          teléfono que hay que ir a mirar.
+        <p className="banda">
+          Poniéndose al día con PEDIDO: faltan <b>{datos.daysMissing}</b> días de clientes
+          {datos.queue ? ` (${datos.queue.pendientes} en cola)` : ""}. Va despacio a propósito.
         </p>
-        {callados.length > 0 && (
-          <div className="tabla-ancha">
-            <table className="movements">
-              <thead>
-                <tr>
-                  <th>Vendedor</th>
-                  <th>Última ruta suya</th>
-                  <th>Lleva</th>
-                  <th>Ficheros atascados</th>
-                  <th>Vendedor de PEDIDO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {callados.map((c) => (
-                  <tr key={c.sellerId}>
-                    <td>{c.seller}</td>
-                    <td className="pv-codigo">{c.lastUpload ?? "nunca ha subido"}</td>
-                    <td>{c.daysSilent < 0 ? "—" : `${c.daysSilent} días`}</td>
-                    <td>{c.stuckFiles > 0 ? c.stuckFiles : "—"}</td>
-                    <td>
-                      {c.linked ? (
-                        "emparejado"
-                      ) : (
-                        <span style={{ color: "var(--pv-cuno)" }}>sin emparejar</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
 
-      {/*
-        Los GPS: las carpetas de Drive.
+      <nav className="colas" role="tablist" aria-label="Qué revisar">
+        {colas.map((c) => (
+          <button
+            key={c.clave}
+            role="tab"
+            aria-selected={actual.clave === c.clave}
+            className="cola-pestana"
+            data-pendiente={c.n > 0}
+            onClick={() => setCola(c.clave)}
+          >
+            <span className="cola-pestana-n">{c.n}</span>
+            {c.titulo}
+          </button>
+        ))}
+      </nav>
 
-        Esto estaba detrás de `carpetas.length > 0`, y dentro va TAMBIÉN el botón de dar
-        de alta una carpeta. O sea: sólo se podían añadir carpetas cuando ya había
-        carpetas. Con la lista vacía —o si `/api/gps` fallaba, que se tragaba el error sin
-        decir nada— se perdían la tabla y el botón a la vez, y no quedaba forma de crear
-        la primera.
-      */}
-      {puede("rutas.alias") && (
-        <div className="tarjeta">
-          <b>
-            {carpetas.length > 0
-              ? `Los GPS · ${sinDueno.length} de ${carpetas.length} sin asignar`
-              : "Los GPS"}
-          </b>
-          <p className="sub">
-            Cada carpeta compartida de Drive <b>es</b> un teléfono: se llama como el
-            perfil del GPS y dentro están sus <span className="pv-codigo">AAAAMMDD.gpx</span>.
-            Están todas aquí — no hay que teclear ninguna. Al decir de quién es una,
-            se colocan de golpe <b>todos los ficheros suyos que estaban esperando</b> y
-            los que entren a partir de ahora caen solos.
-          </p>
-
-          {sinAccesos && (
-            <p className="aviso">
-              No se pudo traer la gente de Accesos, así que el desplegable está vacío y
-              no se puede asignar nada: {sinAccesos}
-            </p>
-          )}
-
-          {sinCarpetas && (
-            <p className="aviso">
-              No se pudieron traer las carpetas: {sinCarpetas}. Lo de abajo está vacío por
-              eso, no porque no haya ninguna.
-            </p>
-          )}
-
-          {!sinCarpetas && carpetas.length === 0 && (
-            <p className="sub">
-              Todavía no hay ninguna carpeta. Se dan de alta solas la primera vez que n8n
-              empuja un fichero de ellas; con el botón de abajo se puede dejar una
-              preparada antes —con un teléfono recién entregado, así sus primeros días
-              entran ya colocados—.
-            </p>
-          )}
-
-          {carpetas.length > 0 && (
-          <div className="tabla-ancha">
-            <table className="movements tabla-gps">
-              <thead>
-                <tr>
-                  <th>Carpeta (el GPS)</th>
-                  {/* La columna sólo hace falta cuando NO se agrupa: si hay franja de
-                      sucursal, la columna repite en cada fila lo que ya dice la franja. */}
-                  {!agruparCarpetas && <th>Sucursal</th>}
-                  <th>Rutas que trajo</th>
-                  <th>Última</th>
-                  <th>De quién es</th>
-                  <th aria-label="Acciones" />
-                </tr>
-              </thead>
-              <tbody>
-                {carpetasPorSucursal.flatMap((grupo) => {
-                  const sinColocar = grupo.filas.filter((g) => g.sellerId === "").length;
-                  const clave = `gps|${grupo.nombre}`;
-                  const abierta = !agruparCarpetas || abiertas.has(clave);
-
-                  return (agruparCarpetas ? [(
-                    <tr className="fila-sucursal" key={`s:${grupo.nombre}`}>
-                      <th colSpan={5}>
-                        <CabeceraSucursal
-                          nombre={grupo.nombre}
-                          abierta={abierta}
-                          alPulsar={() => alternar(clave)}
-                          cuenta={`${grupo.filas.length} GPS`}
-                          alerta={sinColocar > 0 ? `${sinColocar} sin asignar` : ""}
-                        />
-                      </th>
-                    </tr>
-                  )] : []).concat((abierta ? grupo.filas : []).map((g) => (
-                  <tr key={g.id} data-sinduenno={g.sellerId === ""}>
-                    <td>
-                      {g.name}
-                      {g.lastError && <span className="aviso">{g.lastError}</span>}
-                    </td>
-                    {!agruparCarpetas && <td className="pv-codigo">{g.branch || "—"}</td>}
-                    <td>{g.files}</td>
-                    <td className="pv-codigo">
-                      {g.lastFile || "nunca"}
-                      {g.daysSilent > 3 && (
-                        <span className="seller-alerta">{g.daysSilent} días</span>
-                      )}
-                    </td>
-                    <td>
-                      {/*
-                        También cuando YA tiene dueño: un teléfono cambia de manos, y sin
-                        poder cambiarlo la carpeta se queda para siempre a nombre de quien
-                        la llevaba antes — y con ella todo lo que suba a partir de hoy.
-                      */}
-                      <ElegirDueno
-                        carpeta={g}
-                        personas={personas}
-                        alAsignar={cargar}
-                        puedeAsignar={puede("rutas.alias")}
-                      />
-                    </td>
-                    <td className="celda-accion">
-                      {puede("rutas.carpeta") && <QuitarCarpeta carpeta={g} alQuitar={cargar} />}
-                    </td>
-                  </tr>
-                  )));
-                })}
-              </tbody>
-            </table>
-          </div>
-          )}
-
-          {/* Sin la llave no se ofrece: el botón llamaba a un endpoint que iba a
-              contestar 403, y un botón que siempre falla es peor que no tenerlo. */}
+      {actual.clave === "gps" && (
+        <ColaGps
+          sucursal={sucursal}
+          carpetas={carpetas}
+          personas={personas}
+          puedeAsignar={puede("rutas.alias")}
+          puedeQuitar={puede("rutas.carpeta")}
+          alCambiar={cargar}
+          avisos={[
+            ...(sinAccesos ? [`No se pudo traer la gente de Accesos, así que no se puede asignar nada: ${sinAccesos}`] : []),
+            ...(sinCarpetas ? [`No se pudieron traer las carpetas: ${sinCarpetas}`] : []),
+          ]}
+        >
           {puede("rutas.carpeta") && <NuevaCarpeta alCrear={cargar} />}
-        </div>
+        </ColaGps>
       )}
 
-      {/* Quién es quién con PEDIDO. UNA lista con todos. */}
-      {puede("rutas.alias") && (datos.vendors?.length ?? 0) > 0 && (
-        <div className="tarjeta">
-          <b>
-            Vendedores de PEDIDO · {sinDuenno.length} de {datos.vendors!.length} sin
-            emparejar
-          </b>
-          <p className="sub">
-            Sus nombres nacen en el maestro de vendedores y aquí nacen del nombre de
-            una carpeta de Drive, así que no coinciden. Lo que no tiene duda se
-            empareja solo; lo que le vale a dos, no se empareja y se pregunta. Es una
-            vez por vendedor. <b>Mientras uno siga sin emparejar, sus pedidos no se
-            cruzan con ninguna ruta.</b>
-          </p>
+      {actual.clave === "pedido" && (
+        <ColaPedido sucursal={sucursal} vendors={datos.vendors ?? []} vendedores={vendedores} alEmparejar={cargar} />
+      )}
 
-          <div className="tabla-ancha">
-            <table className="movements tabla-vendedores">
-              <thead>
-                <tr>
-                  <th>En PEDIDO</th>
-                  <th>Código</th>
-                  {!agruparVendedores && <th>Sucursal</th>}
-                  <th>Pedidos</th>
-                  <th>Es, aquí</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendedoresPorSucursal.flatMap((grupo) => {
-                  const sinEmparejar = grupo.filas.filter((v) => v.sellerId === "").length;
-                  const clave = `vendedores|${grupo.nombre}`;
-                  const abierta = !agruparVendedores || abiertas.has(clave);
+      {actual.clave === "sinsubir" && <ColaSinSubir sucursal={sucursal} callados={callados} />}
 
-                  return (agruparVendedores ? [(
-                    <tr className="fila-sucursal" key={`s:${grupo.nombre}`}>
-                      <th colSpan={4}>
-                        <CabeceraSucursal
-                          nombre={grupo.nombre}
-                          abierta={abierta}
-                          alPulsar={() => alternar(clave)}
-                          cuenta={`${grupo.filas.length} vendedores`}
-                          alerta={sinEmparejar > 0 ? `${sinEmparejar} sin emparejar` : ""}
-                        />
-                      </th>
+      {actual.clave === "ficheros" && (
+        <section className="cola">
+          {nFicheros === 0 && <p className="cola-vacia">No hay ficheros con problemas.</p>}
+
+          {rotos.length > 0 && (
+            <div className="cola-bloque">
+              <h3 className="cola-bloque-titulo">
+                {rotos.length === 1 ? "Un fichero llegó roto" : `${rotos.length} ficheros llegaron rotos`}
+              </h3>
+              <p className="sub">
+                Llegaron a Drive pero no se pudieron leer. <b>Volver a intentarlo</b> los lee otra
+                vez con el lector de hoy; si falla de nuevo, hay que subirlos otra vez desde el
+                teléfono.
+              </p>
+              {rotos.map((f) => (
+                <FilaRota key={f.id} fichero={f} alReintentar={cargar} puede={puede("rutas.bandeja")} />
+              ))}
+            </div>
+          )}
+
+          {colocables.length > 0 && (
+            <div className="cola-bloque">
+              <h3 className="cola-bloque-titulo">
+                {colocables.length === 1
+                  ? "Un fichero sin colocar"
+                  : `${colocables.length} ficheros sin colocar`}
+              </h3>
+              <p className="sub">
+                Al asignarlos se recuerda el dispositivo y los siguientes de ese teléfono se colocan
+                solos.
+              </p>
+              {colocables.map((f) => (
+                <FilaFichero key={f.id} fichero={f} vendedores={vendedores} alAsignar={cargar} />
+              ))}
+            </div>
+          )}
+
+          {truncados.length > 0 && (
+            <div className="cola-bloque">
+              <h3 className="cola-bloque-titulo">
+                {truncados.length === 1 ? "Un día entró a medias" : `${truncados.length} días entraron a medias`}
+              </h3>
+              <p className="sub">
+                Su fichero se cortó y solo hay el trozo que se pudo leer: <b>sus kilómetros no son
+                los de la jornada</b>. Si hace falta el día completo, hay que volver a subir ese
+                .gpx.
+              </p>
+              <div className="tabla-ancha">
+                <table className="movements">
+                  <thead>
+                    <tr>
+                      <th>Día</th>
+                      <th>Vendedor</th>
+                      <th>Fichero</th>
+                      <th>Puntos</th>
+                      <th>Qué pasó</th>
                     </tr>
-                  )] : []).concat((abierta ? grupo.filas : []).map((v) => (
-                  <tr key={v.ref} data-sinduenno={v.sellerId === ""}>
-                    <td>{v.name}</td>
-                    <td className="pv-codigo">{v.code}</td>
-                    {!agruparVendedores && <td className="pv-codigo">{v.branch || "—"}</td>}
-                    <td>{v.orders}</td>
-                    <td>
-                      {v.sellerId ? (
-                        <>
-                          {v.seller}{" "}
-                          <span className="sub">
-                            {/* De dónde salió: si lo dijo el parecido de nombres es
-                                revisable; si lo dijo una persona, no se toca. */}
-                            {v.origin === "manual" ? "(lo dijo una persona)" : "(por el nombre)"}
-                          </span>
-                        </>
-                      ) : (
-                        <ElegirVendedor vendedor={v} vendedores={vendedores} alEmparejar={cargar} />
-                      )}
-                    </td>
-                  </tr>
-                  )));
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {truncados.map((d) => (
+                      <tr key={`${d.sellerId}:${d.date}`}>
+                        <td className="pv-codigo">{d.date}</td>
+                        <td>{d.seller}</td>
+                        <td className="pv-codigo">{d.file}</td>
+                        <td>{d.points}</td>
+                        <td className="sub">{d.detail}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
       )}
-
     </>
   );
 }
+
+/** Los vendedores de PEDIDO que aún no son nadie aquí: hasta emparejarlos, sus pedidos no se cruzan con ninguna ruta. */
+function ColaPedido({
+  sucursal,
+  vendors,
+  vendedores,
+  alEmparejar,
+}: {
+  sucursal: string;
+  vendors: Vendedor[];
+  vendedores: Seller[];
+  alEmparejar: () => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [soloPendientes, setSoloPendientes] = useState(true);
+
+  const grupos = agruparPorSucursal(vendors, (v) => v.branch, (v) => v.name);
+  const q = busqueda.trim().toLowerCase();
+  const visibles = grupos
+    .filter((g) => !sucursal || g.nombre === sucursal)
+    .map((g) => ({
+      ...g,
+      filas: g.filas.filter(
+        (v) =>
+          (!soloPendientes || v.sellerId === "") &&
+          (!q || v.name.toLowerCase().includes(q) || v.code.toLowerCase().includes(q)),
+      ),
+    }))
+    .filter((g) => g.filas.length > 0);
+  const delAlcance = sucursal ? vendors.filter((v) => v.branch === sucursal) : vendors;
+  const pendientes = delAlcance.filter((v) => v.sellerId === "").length;
+
+  return (
+    <section className="cola">
+      <p className="cola-resumen">
+        {pendientes === 0
+          ? "Todos los vendedores de PEDIDO están emparejados."
+          : `${pendientes} de ${delAlcance.length} vendedores de PEDIDO sin emparejar. Es una vez por vendedor.`}
+      </p>
+
+      <Filtros
+        busqueda={busqueda}
+        alBuscar={setBusqueda}
+        placeholder="Buscar por nombre o usuario"
+      >
+        <label className="filtros-interruptor">
+          <input
+            type="checkbox"
+            checked={soloPendientes}
+            onChange={(e) => setSoloPendientes(e.target.checked)}
+          />
+          Solo sin emparejar
+        </label>
+      </Filtros>
+
+      {visibles.length === 0 ? (
+        <p className="cola-vacia">No hay nada que mostrar con ese filtro.</p>
+      ) : (
+        visibles.map((g) => (
+          <div key={g.nombre} className="cola-grupo">
+            {sucursal === "" && grupos.length > 1 && (
+              <h3 className="cola-grupo-titulo">
+                {g.nombre}
+                <span className="cola-grupo-n">{g.filas.length}</span>
+              </h3>
+            )}
+            <ul className="lista">
+              {g.filas.map((v) => (
+                <li className="gps" key={v.ref} data-sin-dueno={v.sellerId === ""}>
+                  <div className="gps-datos">
+                    <b className="gps-nombre">{v.name}</b>
+                    <span className="gps-meta">
+                      {v.code} · {v.orders} pedidos
+                    </span>
+                  </div>
+                  <div className="gps-dueno">
+                    {v.sellerId ? (
+                      <>
+                        <span className="gps-persona">{v.seller}</span>
+                        <span className="sub">
+                          {v.origin === "manual" ? "lo dijo una persona" : "por el nombre"}
+                        </span>
+                      </>
+                    ) : (
+                      <ElegirVendedor vendedor={v} vendedores={vendedores} alEmparejar={alEmparejar} />
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
+/** Quién lleva días sin subir: o no lleva el GPS encendido, o dejó de subir. Más de 3 días es un teléfono que hay que ir a mirar. */
+function ColaSinSubir({ sucursal, callados: todos }: { sucursal: string; callados: VendedorCallado[] }) {
+  const [busqueda, setBusqueda] = useState("");
+  const q = busqueda.trim().toLowerCase();
+  const callados = sucursal ? todos.filter((c) => c.branchName === sucursal) : todos;
+  const filas = callados.filter((c) => !q || c.seller.toLowerCase().includes(q));
+
+  return (
+    <section className="cola">
+      <p className="cola-resumen">
+        {callados.length === 0
+          ? "Todos están subiendo."
+          : `${callados.length} llevan más de 3 días sin subir una ruta.`}
+      </p>
+
+      <Filtros
+        busqueda={busqueda}
+        alBuscar={setBusqueda}
+        placeholder="Buscar un vendedor"
+      />
+
+      <ul className="lista">
+        {filas.map((c) => (
+          <li className="gps" key={c.sellerId} data-sin-dueno={c.daysSilent < 0 || c.daysSilent > 30}>
+            <div className="gps-datos">
+              <b className="gps-nombre">{c.seller}</b>
+              <span className="gps-meta">
+                {c.lastUpload ? `última ruta ${c.lastUpload}` : "no ha subido nunca"}
+                {c.stuckFiles > 0 && ` · ${c.stuckFiles} ficheros atascados`}
+              </span>
+            </div>
+            <div className="gps-dueno">
+              <span className="gps-callado">
+                {c.daysSilent < 0 ? "nunca" : `${c.daysSilent} días`}
+              </span>
+              {!c.linked && <span className="sub">sin emparejar con PEDIDO</span>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 
 function FilaFichero({
   fichero,
@@ -766,173 +664,6 @@ function FilaRota({
         </p>
       )}
       {fallo && <p className="aviso">{fallo}</p>}
-    </div>
-  );
-}
-
-/** La franja de una sucursal: toda ella es el botón que la abre o la cierra. */
-function CabeceraSucursal({
-  nombre,
-  abierta,
-  alPulsar,
-  cuenta,
-  alerta,
-}: {
-  nombre: string;
-  abierta: boolean;
-  alPulsar: () => void;
-  cuenta: string;
-  alerta: string;
-}) {
-  return (
-    <button type="button" className="plegador" aria-expanded={abierta} onClick={alPulsar}>
-      <span className="plegador-flecha" data-cerrada={!abierta}>▾</span>
-      {nombre}
-      <span className="fila-sucursal-cuenta">{cuenta}</span>
-      {alerta && <span className="fila-sucursal-alerta">{alerta}</span>}
-    </button>
-  );
-}
-
-/**
- * Quitar una carpeta que ya no se usa (el vendedor se fue, el teléfono ya no existe).
- * Es dar de baja, no borrar: lo que ya entró por ella se queda en el histórico.
- */
-function QuitarCarpeta({ carpeta, alQuitar }: { carpeta: Carpeta; alQuitar: () => void }) {
-  const [quitando, setQuitando] = useState(false);
-  const [fallo, setFallo] = useState<string | null>(null);
-
-  async function quitar() {
-    const aviso =
-      `¿Quitar la carpeta «${carpeta.name}»? Deja de barrerse y sale de esta lista. ` +
-      `Lo que ya subió se conserva.`;
-    if (!window.confirm(aviso)) return;
-    setQuitando(true);
-    setFallo(null);
-    try {
-      await borrar(`/api/sources/${carpeta.id}`);
-      alQuitar();
-    } catch (e) {
-      setFallo((e as Error).message);
-      setQuitando(false);
-    }
-  }
-
-  return (
-    <span className="elegir-puesto">
-      <button className="pv-boton-texto" disabled={quitando} onClick={quitar}>
-        {quitando ? "…" : "Quitar"}
-      </button>
-      {fallo && <span className="aviso">{fallo}</span>}
-    </span>
-  );
-}
-
-function ElegirDueno({
-  carpeta,
-  personas,
-  alAsignar,
-  puedeAsignar,
-}: {
-  carpeta: Carpeta;
-  personas: Persona[];
-  alAsignar: () => void;
-  puedeAsignar: boolean;
-}) {
-  const [quien, setQuien] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [hecho, setHecho] = useState<string | null>(null);
-  const [fallo, setFallo] = useState<string | null>(null);
-  // Con dueño ya puesto, el desplegable no se enseña hasta que se pide cambiarlo: la
-  // columna se lee de un vistazo y lo normal es no tocar nada.
-  const [cambiando, setCambiando] = useState(false);
-  // Solo la gente de la sucursal de ESTA carpeta: un super admin recibía las de todas y
-  // asignaba un teléfono de Camagüey a alguien de Holguín. Mientras llega, vale la lista general.
-  const [deLaSucursal, setDeLaSucursal] = useState<Persona[] | null>(null);
-  const eligiendo = puedeAsignar && (!carpeta.sellerId || cambiando);
-
-  useEffect(() => {
-    if (!eligiendo) return;
-    ask<Persona[]>(`/api/personas?carpeta=${encodeURIComponent(carpeta.id)}`)
-      .then((p) => setDeLaSucursal(p ?? []))
-      .catch(() => setDeLaSucursal(null));
-  }, [eligiendo, carpeta.id]);
-
-  async function asignar() {
-    if (!quien) return;
-    setGuardando(true);
-    setFallo(null);
-    try {
-      const persona = lista.find((p) => p.authUserId === quien);
-      const r = await enviar<{ placed: number; days: number }>(
-        `/api/gps/${carpeta.id}/asignar`,
-        { authUserId: quien, name: persona?.name ?? "" },
-      );
-      // Se dice CUÁNTO se arregló, que es la respuesta a «¿sirvió de algo?». Una
-      // carpeta con doscientos días esperando se coloca entera de un clic.
-      setHecho(
-        r.placed > 0
-          ? `${r.placed} ficheros colocados · ${r.days} días recalculados`
-          : "asignada",
-      );
-      alAsignar();
-    } catch (e) {
-      setFallo((e as Error).message);
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  const lista = deLaSucursal ?? personas;
-
-  if (hecho) return <span className="sub">{hecho}</span>;
-
-  // Ya tiene dueño y nadie ha pedido cambiarlo: se enseña quién es y ya.
-  if (carpeta.sellerId && !cambiando) {
-    return (
-      <span className="elegir-puesto">
-        {carpeta.seller}
-        {puedeAsignar && (
-          <button className="pv-boton pv-boton-menudo" onClick={() => setCambiando(true)}>
-            Cambiar
-          </button>
-        )}
-      </span>
-    );
-  }
-
-  // Sin la llave no se ofrece el desplegable: asignar contestaría 403.
-  if (!puedeAsignar) return <span className="sub">sin asignar</span>;
-
-  // Y sin gente que elegir, se dice por qué en vez de enseñar una lista vacía.
-  if (lista.length === 0) {
-    return <span className="sub">no hay gente de esta sucursal en Accesos</span>;
-  }
-
-  return (
-    <div className="elegir">
-      <select value={quien} onChange={(e) => setQuien(e.target.value)}>
-        <option value="">¿De quién es?</option>
-        {lista.map((p) => (
-          <option key={p.authUserId} value={p.authUserId}>
-            {p.name || p.email}
-            {p.roles.length > 0 ? ` · ${p.roles.join(", ").toLowerCase()}` : ""}
-          </option>
-        ))}
-      </select>
-      <button
-        className="pv-boton pv-boton-primario"
-        disabled={!quien || guardando}
-        onClick={asignar}
-      >
-        {guardando ? "…" : "Asignar"}
-      </button>
-      {cambiando && (
-        <button className="pv-boton pv-boton-menudo" onClick={() => setCambiando(false)}>
-          Dejarlo como está
-        </button>
-      )}
-      {fallo && <span className="aviso">{fallo}</span>}
     </div>
   );
 }

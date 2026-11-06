@@ -17,7 +17,7 @@
  * su galleta estaría mintiendo.
  */
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { API, ask, ApiError, type Yo } from "@/lib/api";
 
@@ -27,6 +27,12 @@ interface Estado {
   /** Si la sesión existe pero no puede ni entrar, la llave que le falta. */
   vetado: string | null;
   puede: (clave: string) => boolean;
+  /** Las sucursales que la pantalla de ahora tiene a la vista. Con más de una sale el selector arriba. */
+  sucursales: string[];
+  /** La elegida; vacío = todas. Solo vale si sigue entre las que hay a la vista. */
+  sucursal: string;
+  ofrecerSucursales: (nombres: string[]) => void;
+  elegirSucursal: (nombre: string) => void;
 }
 
 const Contexto = createContext<Estado>({
@@ -34,14 +40,63 @@ const Contexto = createContext<Estado>({
   cargando: true,
   vetado: null,
   puede: () => false,
+  sucursales: [],
+  sucursal: "",
+  ofrecerSucursales: () => {},
+  elegirSucursal: () => {},
 });
 
 export const useSesion = () => useContext(Contexto);
+
+const CLAVE_SUCURSAL = "rutas.sucursal";
+
+/**
+ * La sucursal que se está mirando, la misma en todas las pantallas.
+ *
+ * Quien ve varias sucursales tiene un selector arriba y elige una (o todas); quien solo ve una no
+ * tiene selector y ve esa. La pantalla dice qué sucursales tiene a la vista con `ofrecer` y filtra
+ * por `sucursal`; el selector aparece solo si hay más de una que elegir.
+ */
+export function useSucursal(nombres: string[]) {
+  const { sucursal, ofrecerSucursales } = useContext(Contexto);
+  const clave = nombres.join("|");
+
+  useEffect(() => {
+    ofrecerSucursales(clave ? clave.split("|") : []);
+  }, [clave, ofrecerSucursales]);
+
+  return sucursal;
+}
 
 export function Sesion({ children }: { children: React.ReactNode }) {
   const [yo, setYo] = useState<Yo | null>(null);
   const [cargando, setCargando] = useState(true);
   const [vetado, setVetado] = useState<string | null>(null);
+  const [sucursales, setSucursales] = useState<string[]>([]);
+  const [elegida, setElegida] = useState("");
+
+  // Lo elegido se recuerda en el navegador: quien lleva dos sucursales no la vuelve a elegir
+  // cada mañana.
+  useEffect(() => {
+    try {
+      setElegida(window.localStorage.getItem(CLAVE_SUCURSAL) ?? "");
+    } catch {
+      /* sin almacenamiento: se empieza viendo todas */
+    }
+  }, []);
+
+  const ofrecerSucursales = useCallback((nombres: string[]) => {
+    setSucursales((antes) => (antes.join("|") === nombres.join("|") ? antes : nombres));
+  }, []);
+
+  const elegirSucursal = (nombre: string) => {
+    setElegida(nombre);
+    try {
+      window.localStorage.setItem(CLAVE_SUCURSAL, nombre);
+    } catch {
+      /* se pierde la preferencia, no la pantalla */
+    }
+  };
 
   useEffect(() => {
     ask<Yo>("/api/me")
@@ -71,7 +126,18 @@ export function Sesion({ children }: { children: React.ReactNode }) {
   const puede = (clave: string) => Boolean(yo?.permisos?.[clave]);
 
   return (
-    <Contexto.Provider value={{ yo, cargando, vetado, puede }}>
+    <Contexto.Provider
+      value={{
+        yo,
+        cargando,
+        vetado,
+        puede,
+        sucursales,
+        sucursal: sucursales.includes(elegida) ? elegida : "",
+        ofrecerSucursales,
+        elegirSucursal,
+      }}
+    >
       <header className="barra">
         <Link href="/" className="marca">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -99,6 +165,25 @@ export function Sesion({ children }: { children: React.ReactNode }) {
             permisos. Esto se abre en la computadora de la sucursal, que usa más de
             una persona: quien no pueda salir se levanta creyendo que salió, y el
             siguiente se encuentra la sesión abierta. */}
+        {/* Solo si hay más de una sucursal que elegir: quien ve una sola ve esa y no tiene botón. */}
+        {sucursales.length > 1 && (
+          <label className="barra-sucursal">
+            <span className="barra-sucursal-rotulo">Sucursal</span>
+            <select
+              value={sucursales.includes(elegida) ? elegida : ""}
+              onChange={(e) => elegirSucursal(e.target.value)}
+              aria-label="Sucursal que se está viendo"
+            >
+              <option value="">Todas</option>
+              {sucursales.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <div className="sesion">
           {yo && (
             <span className="sesion-quien">
