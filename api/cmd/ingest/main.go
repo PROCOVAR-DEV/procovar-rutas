@@ -176,6 +176,17 @@ func main() {
 		}()
 	}
 
+	// Los pedidos van por su propio reloj y NO dependen de Drive: sin credenciales de Google la
+	// ingesta arranca «solo queue», y aquí se salía ANTES de poner en marcha esto — el maestro de
+	// vendedores y los pedidos llevaban días sin traerse y «faltan 223 días» no bajaba nunca.
+	//
+	// Un .gpx aparece cuando el vendedor termina el día, pero los pedidos ya estaban puestos por la
+	// mañana. Cada hora es de sobra, y así no se le hacen a PEDIDO cuarenta y ocho consultas
+	// diarias para traer lo mismo.
+	if svcPedidos != nil {
+		go sincronizarPedidos(ctx, svcPedidos, cfg.IntervaloPedidos, log)
+	}
+
 	if *queueOnly {
 		log.Info("solo queue: no se barrerá Drive")
 		<-ctx.Done()
@@ -184,14 +195,6 @@ func main() {
 
 	log.Info("ingesta en marcha",
 		"intervalo", cfg.IntervaloBarrido, "repaso_nightly", cfg.HoraRepasoNocturno)
-
-	// Los pedidos van por su propio reloj, más lento que el de Drive: un .gpx aparece
-	// cuando el vendedor termina el día, pero los pedidos ya estaban puestos por la
-	// mañana. Cada hora es de sobra, y así no se le hacen a PEDIDO cuarenta y ocho
-	// consultas diarias para traer lo mismo.
-	if svcPedidos != nil {
-		go sincronizarPedidos(ctx, svcPedidos, cfg.IntervaloPedidos, log)
-	}
 
 	run(ctx, svc, tipo, log)
 
