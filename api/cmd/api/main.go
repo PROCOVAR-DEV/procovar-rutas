@@ -21,6 +21,8 @@ import (
 	"github.com/procovar/procovar-rutas/api/internal/ingest"
 	"github.com/procovar/procovar-rutas/api/internal/pedido"
 	"github.com/procovar/procovar-rutas/api/internal/queue"
+	"github.com/procovar/procovar-rutas/api/internal/store"
+	"github.com/procovar/procovar-rutas/api/internal/sucursales"
 )
 
 func main() {
@@ -52,6 +54,11 @@ func main() {
 		log.Error("procovar-auth", "error", err)
 		os.Exit(1)
 	}
+
+	// Las sucursales son de Accesos: se enlazan solas por código al arrancar y cada hora. Sin
+	// esto una sucursal nueva (o una que PEDIDO llama distinto) dejaría vendedores y pedidos
+	// «sin sucursal» hasta que alguien tocara datos a mano.
+	go sucursales.Mantener(ctx, store.New(pool), cliAuth, log, time.Hour)
 
 	// The panel can start without a Google credential: it serves the history already
 	// in the database. What will not work is launching a scan by hand, and the

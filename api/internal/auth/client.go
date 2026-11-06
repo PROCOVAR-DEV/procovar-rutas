@@ -246,3 +246,23 @@ func (c *Client) Members(ctx context.Context, orgID string, roles []string) ([]M
 	}
 	return res.Members, nil
 }
+
+// Sucursales trae de Accesos las sucursales que operan, con su código: la sucursal es de
+// Accesos y las aplicaciones no llevan su propia lista.
+func (c *Client) Sucursales(ctx context.Context) ([]Sucursal, error) {
+	var res struct {
+		Sucursales []Sucursal `json:"sucursales"`
+	}
+	if err := c.llamar(ctx, http.MethodGet, "/api/service/sucursales?activas=0", nil, &res); err != nil {
+		return nil, err
+	}
+	return res.Sucursales, nil
+}
+
+// Sucursal es lo que Accesos dice de una sucursal.
+type Sucursal struct {
+	ID     string `json:"id"` // la organización de Accesos; vacío en versiones viejas del endpoint
+	Codigo string `json:"codigo"`
+	Nombre string `json:"nombre"`
+	Activa bool   `json:"activa"`
+}

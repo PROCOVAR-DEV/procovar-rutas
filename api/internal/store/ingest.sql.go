@@ -327,6 +327,32 @@ func (q *Queries) BranchByCode(ctx context.Context, code *string) (Branch, error
 	return i, err
 }
 
+const linkBranchToAccesos = `-- name: LinkBranchToAccesos :exec
+UPDATE sucursal SET
+    codigo = $2,
+    activa = $3,
+    auth_org_id = coalesce(auth_org_id, CASE
+        WHEN $4::text <> ''
+         AND NOT EXISTS (SELECT 1 FROM sucursal o WHERE o.auth_org_id = $4::text AND o.id <> $1)
+        THEN $4::text END),
+    updated_at = now()
+WHERE id = $1
+`
+
+type LinkBranchToAccesosParams struct {
+	ID        string
+	Code      string
+	Active    bool
+	AuthOrgID string
+}
+
+// Enlaza la sucursal con lo que dice Accesos: su código, si opera y su organización. El id
+// de la organización solo se pone si está libre (es único) y si todavía no tenía uno.
+func (q *Queries) LinkBranchToAccesos(ctx context.Context, arg LinkBranchToAccesosParams) error {
+	_, err := q.db.Exec(ctx, linkBranchToAccesos, arg.ID, arg.Code, arg.Active, arg.AuthOrgID)
+	return err
+}
+
 const branchByKey = `-- name: BranchByKey :one
 
 SELECT id, auth_org_id, nombre, activa, timezone, created_at, updated_at, clave, codigo FROM sucursal WHERE clave = $1 LIMIT 1

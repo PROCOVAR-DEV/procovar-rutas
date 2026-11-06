@@ -1255,3 +1255,16 @@ img, svg, video, canvas, table { max-width: 100%; }
         transition: none;
     }
 }
+
+/* Un día que todavía no ha llegado: ni falta ni dato. Sin relleno, para que no compita con las
+   celdas que sí dicen algo. */
+.celda-futura {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px dashed var(--pv-trazo-tenue);
+    color: var(--pv-tinta-suave);
+    cursor: default;
+}
+.celda-futura:hover { border-color: var(--pv-trazo-tenue); }

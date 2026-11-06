@@ -58,6 +58,13 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Hoy en la fecha del navegador, no en UTC: a las 8 de la noche en Cuba UTC ya es mañana. */
+function hoyLocal(): string {
+  const d = new Date();
+
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 // A partir de aquí se considera que el GPS de ese vendedor está fallando. Tres días
 // cubre el fin de semana: la jornada es de lunes a sábado, así que un lunes por la
 // mañana lo último es del sábado y eso es normal.
@@ -115,6 +122,8 @@ export default function Calendar() {
   // Los días del rango, uno por columna. Se calculan aquí y no en el API porque es
   // la cuadrícula la que necesita saber qué columnas pintar, incluso las vacías.
   const week = useMemo(() => diasEntre(desde, hasta), [desde, hasta]);
+  // Un día que todavía no ha llegado no es una falta: ni se pinta en rojo ni cuenta en «subió X de Y».
+  const diasQueYaLlegaron = week.filter((f) => f <= hoyLocal());
 
   const cargarCalendario = useCallback(() => {
     setLoading(true);
@@ -424,7 +433,7 @@ export default function Calendar() {
 
                 return cabecera.concat(grupo.filas.map(([id, v]) => {
                 const summary = resumenDe(id);
-                const conFichero = week.filter((f) => {
+                const conFichero = diasQueYaLlegaron.filter((f) => {
                   const d = v.days.get(f);
                   return d && d.status !== "SIN_FICHERO";
                 }).length;
@@ -471,9 +480,9 @@ export default function Calendar() {
                     <td>
                       <span
                         className="pastilla"
-                        data-bien={conFichero === week.length}
+                        data-bien={conFichero === diasQueYaLlegaron.length}
                       >
-                        {conFichero} de {week.length}
+                        {conFichero} de {diasQueYaLlegaron.length}
                       </span>
                     </td>
 
@@ -523,7 +532,7 @@ export default function Calendar() {
 
               return cabecera.concat(grupo.filas.map(([id, v]) => {
               const summary = resumenDe(id);
-              const conFichero = week.filter((f) => {
+              const conFichero = diasQueYaLlegaron.filter((f) => {
                 const d = v.days.get(f);
                 return d && d.status !== "SIN_FICHERO";
               }).length;
@@ -544,8 +553,8 @@ export default function Calendar() {
                         </span>
                       )}
                     </div>
-                    <span className="pastilla" data-bien={conFichero === week.length}>
-                      subió {conFichero}/{week.length}
+                    <span className="pastilla" data-bien={conFichero === diasQueYaLlegaron.length}>
+                      subió {conFichero}/{diasQueYaLlegaron.length}
                     </span>
                   </div>
 
@@ -629,6 +638,19 @@ function Celda({
   // No row for that day is painted as a miss: that is what it is, and this way an
   // absence is never invisible.
   const status: DayStatus = dia?.status ?? "SIN_FICHERO";
+
+  if (!dia && fecha > hoyLocal()) {
+    return (
+      <div
+        className={tira ? "celda celda-tira celda-futura" : "celda celda-futura"}
+        title={`${vendedor} · ${fecha} · todavía no es ese día`}
+      >
+        {tira && <span className="celda-tira-dia">{dayName(fecha)}</span>}
+        <span className="tenue">todavía no</span>
+      </div>
+    );
+  }
+
   const hubo = status === "OK" || status === "MOVIMIENTO_ESCASO";
   const porque = hubo ? "" : porQueNoHayRuta(status, atasco, resumen);
   const cortado = dia?.flags?.includes(CORTADO) ?? false;

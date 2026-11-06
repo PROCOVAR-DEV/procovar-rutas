@@ -259,6 +259,19 @@ SELECT * FROM sucursal WHERE clave = @key LIMIT 1;
 -- «Bayamo»; allí «Palma Soriano» y aquí «Palma».
 SELECT * FROM sucursal WHERE codigo = @code LIMIT 1;
 
+-- name: LinkBranchToAccesos :exec
+-- Enlaza la sucursal con lo que dice Accesos: su código, si opera y su organización. El id
+-- de la organización solo se pone si está libre (es único) y si todavía no tenía uno.
+UPDATE sucursal SET
+    codigo = @code,
+    activa = @active,
+    auth_org_id = coalesce(auth_org_id, CASE
+        WHEN @auth_org_id::text <> ''
+         AND NOT EXISTS (SELECT 1 FROM sucursal o WHERE o.auth_org_id = @auth_org_id::text AND o.id <> @id)
+        THEN @auth_org_id::text END),
+    updated_at = now()
+WHERE id = @id;
+
 -- name: CreateBranchByKey :one
 -- Si dos empujes llegan a la vez, el segundo choca con el índice único y se queda con
 -- la que creó el primero, en vez de abrir otra. Así aparecieron siete "Guantánamo".
