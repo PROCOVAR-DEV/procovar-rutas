@@ -659,15 +659,17 @@ h1 {
     top: 0;
     z-index: 2;
     text-align: left;
-    padding: 10px 12px 6px;
-    background: var(--pv-papel);
-    border-bottom: 1px solid var(--pv-trazo-tenue);
+    padding: 6px 12px;
+    background: var(--pv-azul-tinte);
+    border-top: 1px solid var(--pv-trazo);
+    border-bottom: 1px solid var(--pv-trazo);
     font-family: var(--font-plex-mono), ui-monospace, monospace;
     font-size: 11px;
     letter-spacing: 0.09em;
     text-transform: uppercase;
-    color: var(--pv-tinta);
+    color: var(--pv-azul-hondo);
 }
+.dark .fila-sucursal > th { color: var(--pv-tinta); }
 
 .fila-sucursal-cuenta {
     margin-left: 10px;
@@ -677,9 +679,13 @@ h1 {
     color: var(--pv-tinta-suave);
 }
 
+/* Lo que hay que hacer en esa sucursal, como una etiqueta: es lo que se busca al mirar la franja. */
 .fila-sucursal-alerta {
     margin-left: 8px;
-    font-weight: 400;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--pv-cuno-tinte);
+    font-weight: 500;
     text-transform: none;
     letter-spacing: 0;
     color: var(--pv-cuno);
@@ -1191,8 +1197,9 @@ img, svg, video, canvas, table { max-width: 100%; }
 }
 
 /* La tabla de vendedores: los que no tienen dueño, marcados. */
-.tabla-vendedores tr[data-sinduenno="true"] td:first-child { font-weight: 600; }
-.tabla-vendedores tr[data-sinduenno="true"] { background: var(--pv-ambar-tinte); }
+/* Sin dueño = accionable. Una regla ámbar al borde y el nombre en negrita: leer un listado de
+   cien filas con cada una rellena de color cansaba y no dejaba ver cuáles eran de verdad. */
+.tabla-vendedores tr[data-sinduenno="true"] td:first-child { font-weight: 600; box-shadow: inset 3px 0 0 var(--pv-ambar); }
 
 .elegir { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .elegir .aviso { margin: 0; }
@@ -1208,8 +1215,11 @@ img, svg, video, canvas, table { max-width: 100%; }
 /* La lista de GPS: las carpetas sin dueño, marcadas.
    Son las accionables — cada una es un teléfono cuyos ficheros están esperando a que
    alguien diga de quién son. */
-.tabla-gps tr[data-sinduenno="true"] { background: var(--pv-ambar-tinte); }
-.tabla-gps tr[data-sinduenno="true"] td:first-child { font-weight: 600; }
+.tabla-gps tr[data-sinduenno="true"] td:first-child { font-weight: 600; box-shadow: inset 3px 0 0 var(--pv-ambar); }
+.tabla-gps td, .tabla-vendedores td { vertical-align: middle; }
+.tabla-gps tbody tr:not(.fila-sucursal):hover td,
+.tabla-vendedores tbody tr:not(.fila-sucursal):hover td { background: var(--pv-azul-tinte); }
+.celda-accion { width: 1%; white-space: nowrap; text-align: right; }
 .tabla-gps .aviso { display: block; margin: 2px 0 0; }
 
 /* El botón de cada sucursal (calendario y Revisar): toda la franja se pulsa. Era un <button>
@@ -1268,3 +1278,36 @@ img, svg, video, canvas, table { max-width: 100%; }
     cursor: default;
 }
 .celda-futura:hover { border-color: var(--pv-trazo-tenue); }
+
+/* El desplegable de «¿de quién es?»: era el <select> crudo del navegador, de otra altura que los
+   botones de al lado. Ahora mide lo mismo y se ve de la misma casa. */
+.elegir select {
+    min-width: 230px;
+    max-width: 100%;
+    height: 32px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--pv-trazo);
+    border-radius: var(--pv-radio);
+    background: var(--pv-blanco);
+    color: var(--pv-tinta);
+    font: inherit;
+    font-size: 13px;
+}
+.elegir select:focus-visible { outline: 2px solid var(--pv-azul); outline-offset: -1px; }
+.elegir .pv-boton { height: 32px; padding-top: 0; padding-bottom: 0; }
+
+/* «Quitar»: una acción que se usa poco y no se deshace desde aquí. Texto y nada más; se vuelve
+   rojo solo al ponerse encima, para que ocho de ellas en pantalla no griten. */
+.pv-boton-texto {
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--pv-radio);
+    background: none;
+    color: var(--pv-tinta-suave);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+.pv-boton-texto:hover:not(:disabled) { background: var(--pv-cuno-tinte); color: var(--pv-cuno); }
+.pv-boton-texto:focus-visible { outline: 2px solid var(--pv-cuno); outline-offset: 1px; }
+.pv-boton-texto:disabled { opacity: .55; cursor: default; }

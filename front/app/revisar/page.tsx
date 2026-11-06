@@ -419,6 +419,7 @@ export default function Revisar() {
                   <th>Rutas que trajo</th>
                   <th>Última</th>
                   <th>De quién es</th>
+                  <th aria-label="Acciones" />
                 </tr>
               </thead>
               <tbody>
@@ -429,7 +430,7 @@ export default function Revisar() {
 
                   return (agruparCarpetas ? [(
                     <tr className="fila-sucursal" key={`s:${grupo.nombre}`}>
-                      <th colSpan={4}>
+                      <th colSpan={5}>
                         <CabeceraSucursal
                           nombre={grupo.nombre}
                           abierta={abierta}
@@ -465,6 +466,8 @@ export default function Revisar() {
                         alAsignar={cargar}
                         puedeAsignar={puede("rutas.alias")}
                       />
+                    </td>
+                    <td className="celda-accion">
                       {puede("rutas.carpeta") && <QuitarCarpeta carpeta={g} alQuitar={cargar} />}
                     </td>
                   </tr>
@@ -817,7 +820,7 @@ function QuitarCarpeta({ carpeta, alQuitar }: { carpeta: Carpeta; alQuitar: () =
 
   return (
     <span className="elegir-puesto">
-      <button className="pv-boton pv-boton-menudo" disabled={quitando} onClick={quitar}>
+      <button className="pv-boton-texto" disabled={quitando} onClick={quitar}>
         {quitando ? "…" : "Quitar"}
       </button>
       {fallo && <span className="aviso">{fallo}</span>}
